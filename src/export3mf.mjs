@@ -67,8 +67,15 @@ function meshXml(id, mesh) {
 }
 
 /**
- * parts: [{ id, name, mesh, extruder, subtype }]  subtype: normal_part | negative_part
- * copies: [{x, y}] plate positions in mm (one object instance per entry)
+ * Two shapes are accepted, and the first is just the common case of the second:
+ *   { parts, copies }  — one part set, repeated at each plate position
+ *   { objects }        — [{ parts, at:{x,y}, name }], a different part set per
+ *                        object.  The calibration plate needs this: every piece
+ *                        carries a different slot, so no two objects share a mesh.
+ *
+ * parts: [{ name, mesh, extruder, subtype }]  subtype: normal_part | negative_part
+ *   (a part's `id` is assigned here — resource ids have to be unique across the
+ *   whole file, which a caller building several objects cannot know locally)
  * filaments: ['#rrggbb', ...] — when given, a minimal project_settings.config
  *   declares that many filament slots.  Without it a 3MF inherits whatever the
  *   open project has, and a project with one filament flattens the part that
@@ -76,7 +83,28 @@ function meshXml(id, mesh) {
  *   Only the filament arrays are written — no printer or print preset — so the
  *   machine profile the user already has selected is left alone.
  */
-export function build3mf({ parts, copies, title = 'Keycap', filaments = null }) {
+export function build3mf({ parts, copies, objects, title = 'Keycap', filaments = null }) {
+  const groups = objects
+    ? objects.map((o, i) => ({ parts: o.parts, at: o.at, name: o.name || `${title} ${i + 1}` }))
+    : copies.map((c) => ({ parts, at: c, name: title }));
+
+  // Renumber every mesh resource, then keep object ids clear of them.  Meshes
+  // are keyed by identity, so the ordinary "same cap 12 times" case still writes
+  // each mesh once and the copies just reference it.
+  const flat = [], ids = new Map();
+  for (const g of groups) {
+    g.parts = g.parts.map((p) => {
+      let id = ids.get(p.mesh);
+      if (id === undefined) {
+        id = flat.length + 1;
+        ids.set(p.mesh, id);
+        flat.push({ ...p, id });
+      }
+      return { ...p, id };
+    });
+  }
+  const OBASE = Math.max(100, flat.length + 10);
+
   const PARTS_PATH = '/3D/Objects/parts.model';
   const partsModel = [
     '<?xml version="1.0" encoding="UTF-8"?>',
@@ -85,22 +113,22 @@ export function build3mf({ parts, copies, title = 'Keycap', filaments = null }) 
       ' xmlns:p="http://schemas.microsoft.com/3dmanufacturing/production/2015/06" requiredextensions="p">',
     ' <metadata name="BambuStudio:3mfVersion">1</metadata>',
     ' <resources>',
-    ...parts.map((p) => meshXml(p.id, p.mesh)),
+    ...flat.map((p) => meshXml(p.id, p.mesh)),
     ' </resources>',
     ' <build/>',
     '</model>', ''
   ].join('\n');
 
   const objs = [], items = [];
-  copies.forEach((c, i) => {
-    const oid = 100 + i;
+  groups.forEach((g, i) => {
+    const oid = OBASE + i;
     objs.push(
       `  <object id="${oid}" type="model">`,
       '   <components>',
-      ...parts.map((p) => `    <component p:path="${PARTS_PATH}" objectid="${p.id}" transform="1 0 0 0 1 0 0 0 1 0 0 0" />`),
+      ...g.parts.map((p) => `    <component p:path="${PARTS_PATH}" objectid="${p.id}" transform="1 0 0 0 1 0 0 0 1 0 0 0" />`),
       '   </components>',
       '  </object>');
-    items.push(`  <item objectid="${oid}" transform="1 0 0 0 1 0 0 0 1 ${f6(c.x)} ${f6(c.y)} 0" printable="1" />`);
+    items.push(`  <item objectid="${oid}" transform="1 0 0 0 1 0 0 0 1 ${f6(g.at.x)} ${f6(g.at.y)} 0" printable="1" />`);
   });
 
   const mainModel = [
@@ -119,13 +147,13 @@ export function build3mf({ parts, copies, title = 'Keycap', filaments = null }) 
 
   const settings = [
     '<?xml version="1.0" encoding="UTF-8"?>', '<config>',
-    ...copies.flatMap((c, i) => {
-      const oid = 100 + i;
+    ...groups.flatMap((g, i) => {
+      const oid = OBASE + i;
       return [
         `  <object id="${oid}">`,
-        `    <metadata key="name" value="${title}"/>`,
+        `    <metadata key="name" value="${g.name}"/>`,
         '    <metadata key="extruder" value="1"/>',
-        ...parts.flatMap((p) => [
+        ...g.parts.flatMap((p) => [
           `    <part id="${p.id}" subtype="${p.subtype}">`,
           `      <metadata key="name" value="${p.name}"/>`,
           ...(p.extruder ? [`      <metadata key="extruder" value="${p.extruder}"/>`] : []),
@@ -141,9 +169,9 @@ export function build3mf({ parts, copies, title = 'Keycap', filaments = null }) 
     '    <metadata key="plater_name" value=""/>',
     '    <metadata key="locked" value="false"/>',
     '    <metadata key="filament_map_mode" value="Auto For Flush"/>',
-    ...copies.map((c, i) =>
+    ...groups.map((g, i) =>
       ['    <model_instance>',
-       `      <metadata key="object_id" value="${100 + i}"/>`,
+       `      <metadata key="object_id" value="${OBASE + i}"/>`,
        '      <metadata key="instance_id" value="0"/>',
        '    </model_instance>'].join('\n')),
     '  </plate>',

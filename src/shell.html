@@ -85,6 +85,8 @@ input:focus-visible,select:focus-visible,button:focus-visible,.chip:focus-visibl
   outline:2px solid var(--accent);outline-offset:1px
 }
 .row.wide{grid-template-columns:1fr}
+.row.text{grid-template-columns:1fr 120px}
+.row.text input{text-align:center;font-weight:600}
 .slide{display:grid;grid-template-columns:1fr 60px;gap:8px;align-items:center}
 input[type=range]{width:100%;accent-color:var(--accent)}
 .seg{display:flex;gap:0;border:1px solid var(--rule);border-radius:var(--r);overflow:hidden}
@@ -214,6 +216,27 @@ table.spec td.n{text-align:right;white-space:nowrap}
           kéo thả cũng được &middot; nền trong suốt hoặc hình đen trên trắng
           <input id="logoFile" type="file" accept=".svg,.png,.jpg,.jpeg,.webp,image/*">
         </label>
+        <div class="row text" style="margin-top:10px">
+          <label for="legendText">Hoặc gõ chữ</label>
+          <input id="legendText" type="text" maxlength="12" placeholder="Esc  F13  ⌘" autocomplete="off" spellcheck="false">
+        </div>
+        <div class="row text"><label for="legendFont">Font chữ</label>
+          <select id="legendFont">
+            <option value="'IBM Plex Sans',sans-serif">Plex Sans</option>
+            <option value="'IBM Plex Mono',monospace">Plex Mono</option>
+            <option value="system-ui,sans-serif">Hệ thống</option>
+            <option value="Georgia,'Times New Roman',serif">Serif</option>
+          </select></div>
+        <div class="row text"><label for="legendWeight">Độ đậm chữ</label>
+          <select id="legendWeight">
+            <option value="400">Thường</option>
+            <option value="600" selected>Vừa đậm</option>
+            <option value="700">Đậm</option>
+          </select></div>
+        <div class="row wide"><label for="legendTrack">Giãn chữ <span class="mono num" id="legendTrackV">0.00</span> em</label>
+          <input id="legendTrack" type="range" min="-0.05" max="0.4" step="0.01" value="0"></div>
+        <p class="note">Nét chữ mảnh hơn 0.8 mm thì in ra dễ mất — chọn độ đậm cao hơn hoặc tăng bề rộng logo.
+          Ký hiệu bàn phím dán vào ô là được, miễn font đang chọn có sẵn ký hiệu đó.</p>
         <p class="note" id="logoInfo"></p>
         <div class="row wide" style="margin-top:11px">
           <div class="seg" id="logoMode">
@@ -259,6 +282,21 @@ table.spec td.n{text-align:right;white-space:nowrap}
         <p class="note" id="dlNote"></p>
         <p class="note">Nếu Bambu hỏi có nạp cấu hình của project trong file hay không, chọn <b>có</b> —
           đó chính là 2 slot filament. File không chứa profile máy in nên máy bạn đang chọn không bị đổi.</p>
+      </fieldset>
+
+      <fieldset>
+        <legend>Khay hiệu chuẩn khe chân</legend>
+        <p class="note" style="margin-top:0">Bề rộng khe vừa hay không còn tuỳ nhựa, tuỳ đầu phun, tuỳ hiệu chuẩn
+          lưu lượng — không suy ra được. In khay này, thử từng mẩu vào switch thật, mẩu nào vừa nhất thì đọc
+          số dập trên mẩu đó rồi nhập vào ô <b>Khe: ngang chữ thập</b>.</p>
+        <div class="row"><label for="calFrom">Khe từ</label><input id="calFrom" type="number" step="0.05" value="4.05"><span class="u">mm</span></div>
+        <div class="row"><label for="calTo">đến</label><input id="calTo" type="number" step="0.05" value="4.35"><span class="u">mm</span></div>
+        <div class="row"><label for="calStep">bước</label><input id="calStep" type="number" step="0.01" value="0.05"><span class="u">mm</span></div>
+        <p class="note" id="calInfo"></p>
+        <button class="btn ghost" id="dlcal" type="button">Tải khay hiệu chuẩn .3mf</button>
+        <p class="note">Mẩu lấy đúng bề cánh, độ sâu khe, đường kính ống và vát dẫn hướng bạn đang đặt ở trên —
+          chỉ khác nhau bề rộng khe. Số dập là đơn vị phần trăm mm: <b>425</b> nghĩa là khe 4.25 mm.
+          In một màu, <b>không bật support</b>.</p>
       </fieldset>
     </div>
 

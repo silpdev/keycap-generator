@@ -28,6 +28,11 @@ yourself. This one asks for the numbers directly and then checks them:
   that is too tight *before* you waste an hour of print time.
 - **Legend from any image.** SVG or PNG/JPG/WebP, traced to real contours with
   holes and islands preserved. Raised, recessed inlay, or cut all the way through.
+- **Legend from typed text.** `Esc`, `F13`, `⌘` — pick a face, a weight and letter
+  spacing. The text is rasterised and fed through the same tested tracer the images
+  go through, so no font-outline parser and no new dependency.
+- **A calibration plate.** One plate of test pieces whose slots step through a range,
+  each with its own width engraved on it. Print it once, keep the number.
 - **Two-colour 3MF.** Cap and legend become separate parts with their own filament,
   and the file declares two filament slots so the assignment survives the import.
 
@@ -47,6 +52,29 @@ keystroke and explains each failure with the number you need to change:
 | Roof | under 1.2 mm, or too thin for the engraving depth |
 | Legend vs top face | legend wider than the top face |
 | Print orientation | face-up when it does not have to be (see below) |
+
+## Calibrating the slot, once
+
+Slot clearance is the one number that cannot be derived. It depends on the filament,
+the nozzle, the flow calibration and how your slicer rounds a 1.3 mm feature, and
+being 0.05 mm out is the difference between a cap that clicks on and one that splits
+the stem or falls off. So don't guess:
+
+1. Set the arm width, slot depth, tube diameter and chamfer you intend to use.
+2. Export the calibration plate — seven pieces from 4.05 to 4.35 mm by default.
+3. Print it in one colour, **supports off**, ~20 minutes.
+4. Push each piece onto a real switch. The one that goes on firmly and comes off
+   without a fight wins.
+5. Read the number engraved on it and type it into *cross span*.
+
+![Seven calibration pieces with 405 to 435 engraved on them](docs/calplate.png)
+
+The number is in hundredths of a millimetre — `425` is a 4.25 mm slot — and it is
+engraved on the face that prints against the build plate, the crispest surface the
+printer has. Each piece is built from the same `buildCapShell` and `buildStem` as a
+real cap, so what the plate measures is what the cap will do; the test suite
+re-measures the slot back out of the finished mesh to make sure the piece really is
+the width printed on it.
 
 ## Three things it gets right that are easy to get wrong
 
@@ -89,6 +117,10 @@ npm test      # no dependencies — the core and the tests use only Node builtin
   no face may repeat a vertex, and the signed volume must be positive. Deliberately
   without mesh repair — a slicer quietly repairing a hole is how one reached the
   printer during development.
+- **`test_cal.mjs`** — the calibration plate. Measures each piece's slot back out of
+  its mesh and requires it to match the number engraved on it to 1e-6 mm, checks the
+  seven-segment bars never touch (a shared vertex would weld into a non-manifold
+  edge), and audits every part the way `test_export.mjs` does.
 - **`test_mesh.mjs`** — writes each part to `out/*.stl` and prints the dimensions.
 
 ## Development
@@ -109,6 +141,7 @@ CI runs the tests and then fails if `docs/index.html` does not match `src/`.
 | `src/vectorize.mjs` | Marching squares over the alpha field, Douglas–Peucker, hole classification by nesting depth |
 | `src/export3mf.mjs` | Zip writer (STORE + CRC32), Bambu-flavoured 3MF, binary STL |
 | `src/build.mjs` | Presets, part assembly, print orientation, plate layout |
+| `src/calibration.mjs` | Seven-segment numerals and the slot calibration plate |
 | `src/app.js` | UI: WebGL preview, section drawing, tolerance table |
 | `src/shell.html` | Markup and CSS, shared by the dev build and the bundle |
 | `bundle.mjs` | Inlines everything into `docs/index.html` |

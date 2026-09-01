@@ -24,6 +24,11 @@ hỏi thẳng số đo rồi kiểm tra lại:
   mất một tiếng in.
 - **Logo từ ảnh nào cũng được.** SVG hoặc PNG/JPG/WebP, tách thành biên dạng thật,
   giữ nguyên lỗ và các đảo rời. Nổi lên, khắc lõm phẳng mặt, hoặc khoét xuyên.
+- **Legend bằng chữ gõ trực tiếp.** `Esc`, `F13`, `⌘` — chọn font, độ đậm, giãn chữ.
+  Chữ được rasterise rồi đẩy qua đúng bộ tách hình đã có test cho ảnh, nên không cần
+  thư viện đọc outline font, không thêm phụ thuộc nào.
+- **Khay hiệu chuẩn khe chân.** Một khay gồm nhiều mẩu thử, khe tăng dần theo bước,
+  mỗi mẩu dập sẵn số của chính nó. In một lần, giữ lấy con số.
 - **3MF hai màu.** Thân cap và logo thành hai part riêng có filament riêng, và file
   khai báo sẵn hai slot filament để phần gán màu không bị mất khi import.
 
@@ -43,6 +48,26 @@ lần bạn gõ, và mỗi lỗi đều nói rõ phải sửa con số nào:
 | Mái cap | dưới 1.2 mm, hoặc quá mỏng so với độ sâu khắc |
 | Logo vs mặt trên | logo rộng hơn mặt trên |
 | Hướng in | in ngửa trong khi không cần thiết (xem dưới) |
+
+## Hiệu chuẩn khe chân, một lần cho xong
+
+Bề rộng khe là con số duy nhất không suy ra được. Nó phụ thuộc nhựa, đầu phun, hiệu
+chuẩn lưu lượng, và cách slicer làm tròn một chi tiết 1.3 mm — lệch 0.05 mm là ranh
+giới giữa một cap bấm vào kêu tách và một cap nứt chân hoặc tuột ra. Nên đừng đoán:
+
+1. Đặt bề cánh, độ sâu khe, đường kính ống và vát dẫn hướng đúng như bạn sẽ dùng.
+2. Xuất khay hiệu chuẩn — mặc định 7 mẩu từ 4.05 đến 4.35 mm.
+3. In một màu, **tắt support**, khoảng 20 phút.
+4. Thử từng mẩu vào switch thật. Mẩu nào vào chắc tay mà rút ra không phải giằng là
+   mẩu thắng.
+5. Đọc số dập trên mẩu đó, nhập vào ô **Khe: ngang chữ thập**.
+
+![Bảy mẩu hiệu chuẩn dập số 405 đến 435](docs/calplate.png)
+
+Số dập theo đơn vị phần trăm mm — `425` là khe 4.25 mm — và được khắc trên mặt áp
+xuống bàn in, mặt sắc nét nhất máy in làm được. Mỗi mẩu dựng từ đúng `buildCapShell`
+và `buildStem` của cap thật, nên khay đo cái gì thì cap ra đúng cái đó; bộ test còn đo
+lại bề rộng khe từ mesh đã dựng để chắc mẩu đúng bằng con số dập trên nó.
 
 ## Ba chỗ dễ sai mà nó làm đúng
 
@@ -82,6 +107,10 @@ npm test      # không cần cài gì — core và test chỉ dùng builtin củ
   độ logo × hướng in: mỗi cạnh phải xuất hiện đúng hai lần, không mặt nào trùng đỉnh,
   và thể tích có dấu phải dương. Cố ý không vá mesh — vì slicer âm thầm vá một lỗ
   thủng chính là cách nó lọt tới máy in một lần trong quá trình phát triển.
+- **`test_cal.mjs`** — khay hiệu chuẩn. Đo lại bề rộng khe từ mesh của từng mẩu và
+  buộc khớp với số dập trên mẩu tới 1e-6 mm, kiểm các thanh chữ số 7 đoạn không được
+  dính nhau (dính là hàn thành cạnh không manifold), và soi từng part như
+  `test_export.mjs`.
 - **`test_mesh.mjs`** — ghi từng part ra `out/*.stl` rồi in kích thước.
 
 ## Phát triển
@@ -102,6 +131,7 @@ CI chạy test rồi báo lỗi nếu `docs/index.html` không khớp với `src
 | `src/vectorize.mjs` | Marching squares trên trường alpha, Douglas–Peucker, phân lớp lỗ theo nesting |
 | `src/export3mf.mjs` | Zip writer (STORE + CRC32), 3MF kiểu Bambu, STL nhị phân |
 | `src/build.mjs` | Preset, ghép part, hướng in, xếp cap trên khay |
+| `src/calibration.mjs` | Chữ số 7 đoạn và khay hiệu chuẩn khe chân |
 | `src/app.js` | UI: preview WebGL, bản vẽ mặt cắt, bảng kiểm tra dung sai |
 | `src/shell.html` | Markup và CSS, dùng chung cho bản dev và bản bundle |
 | `bundle.mjs` | Nhồi tất cả vào `docs/index.html` |

@@ -91,6 +91,7 @@
   $('logoFile').addEventListener('change', (e) => { if (e.target.files[0]) takeFile(e.target.files[0]); });
   $('clearLogo').onclick = () => {
     rawField = null; logoRings = null; logoName = ''; logoSlug = 'keycap'; logoInfo = '';
+    $('legendText').value = ''; $('logoFile').value = ''; textJob++;
     $('fileName').textContent = 'Chọn file SVG hoặc PNG';
     $('logoInfo').textContent = '';
     rebuild();
@@ -172,10 +173,87 @@
     return { f, w: c.width, h: c.height, srcNote, small: !isSvg && Math.max(nw, nh) < 256 };
   }
 
+  /**
+   * Rasterise typed text into the same coverage field an upload produces, so the
+   * text path shares the tested marching-squares vectoriser rather than needing
+   * a font-outline parser.  Drawn at a large pixel size and measured with the
+   * glyphs' own ink box: a legend has to sit centred on the cap, and a font's
+   * ascent/descent metrics describe the font, not the letters actually typed
+   * ("F13" has no descender, and lining it up on the baseline would push it
+   * visibly high).
+   */
+  async function textToField(text, opt) {
+    const PX = 340;
+    const font = `${opt.weight} ${PX}px ${opt.font}`;
+    try { await document.fonts.load(font, text); } catch (e) { /* fallback face */ }
+
+    const c = document.createElement('canvas');
+    const g = c.getContext('2d', { willReadFrequently: true });
+    const setup = (ctx) => {
+      ctx.font = font;
+      if ('letterSpacing' in ctx) ctx.letterSpacing = `${opt.track}em`;
+      ctx.textBaseline = 'alphabetic';
+      ctx.textAlign = 'left';
+    };
+    setup(g);
+    const m = g.measureText(text);
+    const left = m.actualBoundingBoxLeft, right = m.actualBoundingBoxRight;
+    const asc = m.actualBoundingBoxAscent, desc = m.actualBoundingBoxDescent;
+    const iw = Math.ceil(right + left), ih = Math.ceil(asc + desc);
+    if (!(iw > 0 && ih > 0)) return null;
+
+    const pad = 10;
+    c.width = iw + pad * 2; c.height = ih + pad * 2;
+    setup(g);
+    g.fillStyle = '#000';
+    g.fillText(text, pad + left, pad + asc);
+
+    const d = g.getImageData(0, 0, c.width, c.height).data;
+    const f = new Float32Array(c.width * c.height);
+    let ink = 0;
+    for (let p = 0, i = 3; i < d.length; i += 4, p++) { f[p] = d[i] / 255; if (f[p] > 0.5) ink++; }
+    if (!ink) return null;
+    return { f, w: c.width, h: c.height,
+             srcNote: `chữ “${text}” · ${iw}×${ih} px`, isText: true };
+  }
+
+  const legendOpts = () => ({
+    text: $('legendText').value.trim(),
+    font: $('legendFont').value,
+    weight: $('legendWeight').value,
+    track: parseFloat($('legendTrack').value) || 0,
+  });
+
+  let textJob = 0;
+  async function applyText() {
+    const o = legendOpts();
+    const job = ++textJob;
+    if (!o.text) return;
+    const field = await textToField(o.text, o);
+    if (job !== textJob) return;                   // a newer keystroke won
+    if (!field) { toast('Font đang chọn không vẽ được ký tự này'); return; }
+    rawField = field;
+    logoName = `chữ “${o.text}”`; logoSlug = o.text;
+    $('fileName').textContent = logoName;
+    $('logoFile').value = '';
+    revectorize();
+    rebuild();
+  }
+
+  let textT = 0;
+  for (const k of ['legendText', 'legendFont', 'legendWeight', 'legendTrack'])
+    $(k).addEventListener('input', () => {
+      if (k === 'legendTrack') $('legendTrackV').textContent = legendOpts().track.toFixed(2);
+      clearTimeout(textT);
+      textT = setTimeout(applyText, k === 'legendText' ? 220 : 60);
+    });
+
   async function takeFile(file) {
     try {
       rawField = await fileToField(file);
       logoName = file.name; logoSlug = file.name;
+      $('legendText').value = '';
+      textJob++;
       $('fileName').textContent = file.name;
       revectorize();
       if (!logoRings || !logoRings.length) toast('Không tách được hình — thử kéo thanh “ngưỡng tách hình”');
@@ -410,7 +488,15 @@
   // painter's-algorithm sorting shreds that (interior walls punch through the
   // skirt, the legend fights the top face).  WebGL settles it per pixel.
   const cv = $('view');
-  let az = 0.62, el = 0.44, zoom = 1, drag = null;
+  // Default camera: front-left-above, near enough head-on that the cap's +x axis
+  // stays roughly horizontal on screen.  The old default sat in the +x/+y quadrant,
+  // i.e. behind the cap, which projected +x to screen-left and +y to screen-down —
+  // the top face came up rotated 180°.  Nobody could see that while the bundled
+  // sample logo was the only artwork, because it is symmetric; type "F13" on it
+  // and the legend reads upside down.  Front-right also makes "dịch ngang +" move
+  // the legend to the right on screen, which is the only thing the slider can
+  // sensibly mean.
+  let az = -1.20, el = 0.42, zoom = 1, drag = null;
   let gl = null, prog = null, vbo = null, gridVbo = null, nTri = 0, nGrid = 0, U = {}, A = {};
 
   const VS = `
@@ -617,6 +703,33 @@
   };
   $('dlstl').onclick = () =>
     offer(`${slug()}-${P.capW.toFixed(1)}mm.stl`, exportKeycapStl({ ...P, name: slug() }, logoRings));
+  // ------------------------------------------------- calibration plate
+  const calOpts = () => ({
+    from: parseFloat($('calFrom').value), to: parseFloat($('calTo').value),
+    step: parseFloat($('calStep').value),
+    // the strip has to test the stem the user is actually about to print
+    stemArm: P.stemArm, stemSlotDepth: P.stemSlotDepth, stemDia: P.stemDia,
+    leadIn: P.leadIn, leadInH: P.leadInH,
+  });
+  function drawCalInfo() {
+    const o = calOpts();
+    if (!isFinite(o.from) || !isFinite(o.to) || !isFinite(o.step)) { $('calInfo').textContent = ''; return; }
+    const spans = calSpans(o);
+    const over = Math.round((o.to - o.from) / Math.max(0.01, Math.abs(o.step))) + 1 > 24;
+    $('calInfo').textContent = `${spans.length} mẩu: ` +
+      spans.map((s) => s.toFixed(2)).join(' · ') + (over ? ' (giới hạn 24 mẩu)' : '');
+  }
+  for (const k of ['calFrom', 'calTo', 'calStep']) $(k).addEventListener('input', drawCalInfo);
+  $('dlcal').onclick = () => {
+    const o = calOpts();
+    if (!isFinite(o.from) || !isFinite(o.to) || o.to < o.from) {
+      toast('Khoảng khe không hợp lệ — “đến” phải lớn hơn hoặc bằng “từ”'); return;
+    }
+    const spans = calSpans(o);
+    offer(`khe-hieu-chuan-${spans[0].toFixed(2)}-${spans[spans.length - 1].toFixed(2)}.3mf`,
+      exportCalibration3mf(o, P.plate));
+  };
+
   $('dljson').onclick = () => {
     const cfg = { app: 'xuong-keycap-mx', v: 1, params: P, logo: logoName || null,
                   logoRings: logoRings || null };
@@ -624,7 +737,7 @@
   };
 
   if (SANDBOXED) {
-    $('dl3mf').disabled = true; $('dlstl').disabled = true;
+    $('dl3mf').disabled = true; $('dlstl').disabled = true; $('dlcal').disabled = true;
     $('dlNote').innerHTML = 'Trang đã publish chỉ được lưu các định dạng trong danh sách cho phép, <b>không có .3mf/.stl</b>. ' +
       'Chỉnh xong ở đây rồi bấm <b>Lưu thông số .json</b>, mở file HTML offline và nạp lại — hoặc xuất trực tiếp trong bản offline.';
     const load = document.createElement('label');
@@ -656,5 +769,6 @@
   // ------------------------------------------------------------------ boot
   $('fileName').textContent = logoName;
   syncInputs();
+  drawCalInfo();
   rebuild();
 })();
