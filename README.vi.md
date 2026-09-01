@@ -1,0 +1,139 @@
+# Xưởng Keycap MX
+
+Công cụ sinh keycap Cherry MX chạy ngay trên trình duyệt. Nhập đúng số đo bạn cặp
+được bằng thước cặp, kéo vào một file SVG hoặc PNG, rồi xuất ra `.3mf` hai màu mở
+Bambu Studio là in được.
+
+**[▶ Mở công cụ](https://silpdev.github.io/keycap-generator/)** — không cần cài,
+không cần đăng ký. Một file HTML duy nhất, lưu về máy mở offline cũng chạy.
+
+![Công cụ: cột thông số, preview 3D, bản vẽ mặt cắt và bảng kiểm tra dung sai](docs/screenshot-light.png)
+
+## Vì sao làm thêm một cái nữa
+
+Phần lớn generator keycap khoá bạn vào đơn vị bàn phím (1u, 1.25u, …) và giấu phần
+chân sau một nút ± mơ hồ. Với bàn phím thì ổn, nhưng với một cái clicker giải trí,
+vỏ macropad, hay bất cứ hộp nào mà bạn tự đo khoảng cách switch thì vô dụng. Cái này
+hỏi thẳng số đo rồi kiểm tra lại:
+
+- **Kích thước tự do.** Đáy, mặt trên, chiều cao, bán kính góc, dày thành, sâu hốc
+  switch — nhập trực tiếp theo mm. Cap không vuông cũng được.
+- **Chân MX bằng số.** Ngang chữ thập, bề cánh, độ sâu khe, đường kính ống, vát dẫn
+  hướng. Chân switch Cherry MX thật đo được **4.10 × 1.30 mm**; khe in ra nên rộng
+  hơn **0.10–0.20 mm** để bù co ngót. Bảng kiểm tra báo khe quá chật *trước khi* bạn
+  mất một tiếng in.
+- **Logo từ ảnh nào cũng được.** SVG hoặc PNG/JPG/WebP, tách thành biên dạng thật,
+  giữ nguyên lỗ và các đảo rời. Nổi lên, khắc lõm phẳng mặt, hoặc khoét xuyên.
+- **3MF hai màu.** Thân cap và logo thành hai part riêng có filament riêng, và file
+  khai báo sẵn hai slot filament để phần gán màu không bị mất khi import.
+
+## Nó tự kiểm những gì
+
+Bảng kiểm tra dung sai bên phải là phần đáng giá nhất của tool. Nó tính lại theo từng
+lần bạn gõ, và mỗi lỗi đều nói rõ phải sửa con số nào:
+
+| Hạng mục | Báo lỗi khi |
+|---|---|
+| Khe chữ thập | dư so với chân 4.10 mm dưới 0.05 mm hoặc trên 0.40 mm |
+| Thành chân | thành ống mỏng hơn 0.50 mm — bằng một đường đùn, dễ nứt |
+| Sâu khe | nông hơn 3.4 mm, cap dễ tuột |
+| Hốc switch | ở vành hẹp hơn 13.4 mm, cap chặn vào vỏ switch |
+| Thành vỏ cap | mỏng hơn 0.80 mm, vỏ in rỗng và bong khỏi mái |
+| Hốc ở đỉnh | dưới 9.5 mm, vỏ trên switch chạm vào phần vuốt |
+| Mái cap | dưới 1.2 mm, hoặc quá mỏng so với độ sâu khắc |
+| Logo vs mặt trên | logo rộng hơn mặt trên |
+| Hướng in | in ngửa trong khi không cần thiết (xem dưới) |
+
+## Ba chỗ dễ sai mà nó làm đúng
+
+**Hốc vuốt theo vỏ ngoài.** Vỏ vuốt vào mà hốc dựng thẳng thì thành bị bóp dần theo
+độ cao: cap 17.5 mm vuốt xuống 12.5 mm, thành ở vành 1.6 mm nhưng ở đỉnh hốc chỉ còn
+**0.34 mm**. Mỏng hơn một đường đùn, slicer in ra rỗng, và vỏ cap tách rời khỏi mái
+thành một cái khung riêng. Ở đây hốc được vuốt song song với vỏ ngoài nên thành dày
+đều suốt chiều cao — đúng cách cap thương mại được làm.
+
+**Nó tự lật cap khi xuất.** Dựng đứng trên vành hở thì mái hốc switch là một cái cầu
+~300 mm² và slicer đòi bật support — mà support sẽ chui vào hốc switch với khe chân,
+hỏng độ vừa. Xuất úp mặt trên xuống, cùng cap đó chỉ còn **3.6 mm²** overhang (đo
+từng lớp 0.2 mm), mặt trên áp mặt bàn in nên bóng, và logo khắc lõm nằm ở các lớp
+đầu — đúng thứ cho ra inlay hai màu sắc nét. Logo nổi thì không lật được nên giữ
+in ngửa, và tool nói rõ điều đó.
+
+**Không cần boolean, không cần vá mesh.** Cap, chân và logo được ghi thành các part
+riêng trong cùng một object 3MF — part thường thì cộng, `negative_part` thì trừ, và
+slicer làm phép boolean. Nhờ vậy không phải nạp kernel CSG bằng WASM, và mỗi part chỉ
+cần kín khối riêng nó. Chúng kín thật: bộ test soi từng cạnh của từng part mà không
+cho thư viện mesh nào vá trước.
+
+## Kiểm tra
+
+```bash
+npm test      # không cần cài gì — core và test chỉ dùng builtin của Node
+```
+
+- **`test_tri.mjs`** — tam giác hoá có lỗ. So **tổng diện tích tam giác thu được**
+  với diện tích đúng (ngoài trừ lỗ) trên 9 ca: 1, 2, 4, 20 và 30 lỗ, một vành có các
+  rãnh mảnh hướng tâm, một lỗ hình sao 60 đỉnh. Lệch phải bằng 0.00% — lệch dương
+  nghĩa là có lỗ bị lấp.
+- **`test_vec.mjs`** — tách hình từ ảnh. Rasterise một polygon đã biết rồi truy hồi
+  lại: diện tích lệch dưới 0.1%, lệch hình học lớn nhất dưới 0.02 mm. Kèm ca donut và
+  một đảo rời để phủ phần phân lớp lỗ.
+- **`test_export.mjs`** — mọi part sắp ghi vào 3MF, trên **27 tổ hợp** preset × chế
+  độ logo × hướng in: mỗi cạnh phải xuất hiện đúng hai lần, không mặt nào trùng đỉnh,
+  và thể tích có dấu phải dương. Cố ý không vá mesh — vì slicer âm thầm vá một lỗ
+  thủng chính là cách nó lọt tới máy in một lần trong quá trình phát triển.
+- **`test_mesh.mjs`** — ghi từng part ra `out/*.stl` rồi in kích thước.
+
+## Phát triển
+
+```bash
+npm install     # chỉ để chạy dev server
+npm run dev     # vite, hot reload
+
+npm run bundle  # build lại docs/index.html (vừa là site vừa là bản offline)
+npm test
+```
+
+CI chạy test rồi báo lỗi nếu `docs/index.html` không khớp với `src/`.
+
+| File | Việc |
+|---|---|
+| `src/geom.mjs` | Rounded rect, cross MX, tam giác hoá có lỗ (ear clipping + bridge), lớp `Mesh`, dựng vỏ cap / chân / prism logo |
+| `src/vectorize.mjs` | Marching squares trên trường alpha, Douglas–Peucker, phân lớp lỗ theo nesting |
+| `src/export3mf.mjs` | Zip writer (STORE + CRC32), 3MF kiểu Bambu, STL nhị phân |
+| `src/build.mjs` | Preset, ghép part, hướng in, xếp cap trên khay |
+| `src/app.js` | UI: preview WebGL, bản vẽ mặt cắt, bảng kiểm tra dung sai |
+| `src/shell.html` | Markup và CSS, dùng chung cho bản dev và bản bundle |
+| `bundle.mjs` | Nhồi tất cả vào `docs/index.html` |
+| `tools/make-sample-logo.mjs` | Sinh lại hình mẫu đi kèm |
+
+Không vendor thư viện nào: tam giác hoá, tách hình từ ảnh, ghi zip và ghi 3MF đều nằm
+trong bốn file trên.
+
+## Hai màu trong Bambu Studio
+
+Part logo mang `<metadata key="extruder" value="2"/>` trong `model_settings.config` —
+đúng cách Bambu gán filament cho từng part. Nhưng project chỉ có một filament sẽ ép
+part đó về filament 1 và cap ra một màu, nên file xuất còn nhúng một
+`project_settings.config` tối giản khai báo hai slot filament theo đúng màu bạn chọn.
+File này chỉ chứa các mảng filament, không chứa profile máy in hay print preset, nên
+máy bạn đang chọn không bị đổi. Bambu hỏi có nạp cấu hình của project không thì chọn
+**có**.
+
+Hai màu vẫn cần project có hai filament. Không có AMS hay slot thứ hai thì không file
+nào làm ra được.
+
+## Ghi công
+
+Ý tưởng đến từ [vostoklabs/SVG-keycap-generator](https://github.com/vostoklabs/SVG-keycap-generator)
+— đáng xem nếu bạn cần profile keycap được dựng sẵn và các cỡ chuẩn bàn phím. Hai
+project không dùng chung dòng code nào; cái này viết lại từ đầu quanh việc nhập số đo
+trực tiếp và kiểm tra dung sai.
+
+Số đo trong các preset được cặp từ những cap lắp vừa switch thật. Hình mẫu đi kèm do
+`tools/make-sample-logo.mjs` sinh ra; bạn dùng artwork của mình thì kiểm tra license
+của nó trước khi in hoặc chia sẻ.
+
+## Giấy phép
+
+MIT — xem [LICENSE](LICENSE).

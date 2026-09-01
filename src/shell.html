@@ -1,0 +1,286 @@
+<title>Xưởng Keycap MX</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  --paper:#E9EBE4; --panel:#F4F6F0; --sunk:#DFE3D9;
+  --ink:#191F1A; --ink2:#5B6357; --ink3:#868D80;
+  --rule:#C9CEC2; --grid:#D9DDD2;
+  --accent:#2E6F5E; --accent-ink:#1D4C40; --accent-soft:#D9E7E0;
+  --warn:#A2492A; --warn-soft:#F2E1D9;
+  --cap-face:#7E8A7C; --cap-lit:#A9B4A4; --cap-dark:#4E574C;
+  --logo-face:#D8DCCF; --logo-lit:#F2F4EC; --logo-dark:#A7AE9C;
+  --r:3px;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#141713; --panel:#1C201B; --sunk:#101310;
+    --ink:#E4E8DE; --ink2:#98A090; --ink3:#6E7568;
+    --rule:#2D332C; --grid:#232922;
+    --accent:#63B79B; --accent-ink:#8FD3BB; --accent-soft:#1C2B25;
+    --warn:#D9835E; --warn-soft:#32211A;
+    --cap-face:#5D6A5B; --cap-lit:#87947F; --cap-dark:#333B31;
+    --logo-face:#9FA895; --logo-lit:#CBD2BF; --logo-dark:#6E7566;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#141713; --panel:#1C201B; --sunk:#101310;
+  --ink:#E4E8DE; --ink2:#98A090; --ink3:#6E7568;
+  --rule:#2D332C; --grid:#232922;
+  --accent:#63B79B; --accent-ink:#8FD3BB; --accent-soft:#1C2B25;
+  --warn:#D9835E; --warn-soft:#32211A;
+  --cap-face:#5D6A5B; --cap-lit:#87947F; --cap-dark:#333B31;
+  --logo-face:#9FA895; --logo-lit:#CBD2BF; --logo-dark:#6E7566;
+}
+*{box-sizing:border-box}
+body{
+  margin:0; background:var(--paper); color:var(--ink);
+  font:400 14px/1.5 "IBM Plex Sans","Helvetica Neue",Arial,sans-serif;
+  -webkit-font-smoothing:antialiased;
+}
+h1,h2,h3,.eyebrow,.chip,button{font-family:"IBM Plex Sans Condensed","IBM Plex Sans",Arial,sans-serif}
+.mono,input[type=number],.num,td.n,.dim{font-family:"IBM Plex Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums}
+
+/* ---------- shell ---------- */
+.app{display:flex;flex-direction:column;min-height:100vh}
+header{
+  display:flex;flex-wrap:wrap;align-items:baseline;gap:8px 18px;
+  padding:14px 20px;border-bottom:1px solid var(--rule);background:var(--panel);
+}
+header h1{margin:0;font-size:19px;font-weight:700;letter-spacing:-.01em}
+header .sub{color:var(--ink2);font-size:12.5px;flex:1 1 260px}
+.presets{display:flex;flex-wrap:wrap;gap:6px}
+.chip{
+  border:1px solid var(--rule);background:var(--paper);color:var(--ink2);
+  padding:5px 11px;border-radius:100px;font-size:12px;font-weight:600;cursor:pointer;
+  letter-spacing:.01em;
+}
+.chip:hover{border-color:var(--accent);color:var(--accent)}
+.chip[aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:var(--panel)}
+
+main{display:grid;grid-template-columns:322px minmax(0,1fr);flex:1;min-height:0}
+@media (max-width:900px){ main{grid-template-columns:1fr} }
+
+/* ---------- parameter rail ---------- */
+.rail{
+  border-right:1px solid var(--rule);background:var(--panel);
+  padding:0 0 40px;overflow-y:auto;max-height:calc(100vh - 60px);
+}
+@media (max-width:900px){ .rail{max-height:none;border-right:0;border-top:1px solid var(--rule);order:2} }
+fieldset{border:0;border-bottom:1px solid var(--rule);margin:0;padding:15px 18px 17px}
+legend{
+  display:block;width:100%;padding:0;margin-bottom:11px;
+  font-family:"IBM Plex Sans Condensed",Arial,sans-serif;font-size:11px;font-weight:700;
+  letter-spacing:.13em;text-transform:uppercase;color:var(--ink3);
+}
+.row{display:grid;grid-template-columns:1fr 74px 20px;align-items:center;gap:8px;margin-bottom:7px}
+.row label{font-size:13px;color:var(--ink2)}
+.row .u{font-size:11px;color:var(--ink3)}
+input[type=number],select,input[type=text]{
+  width:100%;padding:5px 7px;font-size:13px;
+  border:1px solid var(--rule);border-radius:var(--r);
+  background:var(--paper);color:var(--ink);
+}
+input[type=number]{text-align:right}
+input:focus-visible,select:focus-visible,button:focus-visible,.chip:focus-visible,label.file:focus-within{
+  outline:2px solid var(--accent);outline-offset:1px
+}
+.row.wide{grid-template-columns:1fr}
+.slide{display:grid;grid-template-columns:1fr 60px;gap:8px;align-items:center}
+input[type=range]{width:100%;accent-color:var(--accent)}
+.seg{display:flex;gap:0;border:1px solid var(--rule);border-radius:var(--r);overflow:hidden}
+.seg button{
+  flex:1;padding:6px 4px;font-size:12px;font-weight:600;border:0;cursor:pointer;
+  background:var(--paper);color:var(--ink2);border-right:1px solid var(--rule);
+}
+.seg button:last-child{border-right:0}
+.seg button[aria-pressed=true]{background:var(--accent);color:var(--panel)}
+label.file{
+  display:block;border:1px dashed var(--rule);border-radius:var(--r);
+  padding:13px 10px;text-align:center;font-size:12.5px;color:var(--ink2);cursor:pointer;
+  background:var(--paper);
+}
+label.file:hover{border-color:var(--accent);color:var(--accent)}
+label.file input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+label.file b{display:block;font-weight:600;color:var(--ink);font-size:13px;margin-bottom:2px}
+.check{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink2);margin:9px 0 2px;cursor:pointer}
+.check input{accent-color:var(--accent);width:15px;height:15px}
+.btn{
+  display:block;width:100%;padding:9px 12px;margin-top:8px;cursor:pointer;
+  border:1px solid var(--accent);border-radius:var(--r);
+  background:var(--accent);color:var(--panel);font-size:13.5px;font-weight:600;letter-spacing:.01em;
+}
+.btn:hover{background:var(--accent-ink);border-color:var(--accent-ink)}
+.btn.ghost{background:transparent;color:var(--accent);}
+.btn.ghost:hover{background:var(--accent-soft);color:var(--accent-ink)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.note{font-size:11.5px;line-height:1.45;color:var(--ink3);margin:9px 0 0}
+.note b{color:var(--ink2)}
+.colors{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:2px 0 4px}
+.colors label{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--ink2)}
+.colors input[type=color]{
+  width:30px;height:24px;padding:0;border:1px solid var(--rule);border-radius:var(--r);
+  background:var(--paper);cursor:pointer;flex:none
+}
+
+/* ---------- stage ---------- */
+.stage{display:flex;flex-direction:column;min-width:0;background:var(--paper)}
+.viewwrap{position:relative;flex:1 1 auto;min-height:330px;background:var(--sunk)}
+canvas{display:block;width:100%;height:100%;touch-action:none}
+.hint{
+  position:absolute;left:12px;bottom:10px;font-size:11px;color:var(--ink3);
+  background:color-mix(in srgb, var(--sunk) 78%, transparent);padding:3px 7px;border-radius:100px;
+  pointer-events:none;
+}
+.readout{
+  position:absolute;right:12px;top:11px;text-align:right;font-size:11.5px;color:var(--ink2);
+  line-height:1.7;pointer-events:none;
+}
+.readout .big{display:block;font-size:15px;color:var(--ink);font-weight:500}
+.lower{display:grid;grid-template-columns:minmax(0,340px) minmax(0,1fr);border-top:1px solid var(--rule)}
+@media (max-width:760px){ .lower{grid-template-columns:1fr} }
+.pane{padding:14px 18px 18px;min-width:0}
+.pane+.pane{border-left:1px solid var(--rule)}
+@media (max-width:760px){ .pane+.pane{border-left:0;border-top:1px solid var(--rule)} }
+.eyebrow{
+  font-size:11px;font-weight:700;letter-spacing:.13em;text-transform:uppercase;
+  color:var(--ink3);margin:0 0 10px
+}
+#section{width:100%;height:246px;background:transparent}
+table.spec{width:100%;border-collapse:collapse;font-size:12.5px}
+table.spec th{
+  text-align:left;font-weight:600;font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;
+  color:var(--ink3);padding:0 8px 6px 0;border-bottom:1px solid var(--rule)
+}
+table.spec td{padding:5px 8px 5px 0;border-bottom:1px solid var(--grid);vertical-align:top}
+table.spec td.n{text-align:right;white-space:nowrap}
+.pill{
+  display:inline-block;padding:1px 7px 2px;border-radius:100px;font-size:10.5px;font-weight:600;
+  letter-spacing:.02em;white-space:nowrap
+}
+.pill.ok{background:var(--accent-soft);color:var(--accent-ink)}
+.pill.no{background:var(--warn-soft);color:var(--warn)}
+.msgs{list-style:none;margin:12px 0 0;padding:0;display:flex;flex-direction:column;gap:7px}
+.msgs li{
+  font-size:12.5px;line-height:1.45;padding:8px 10px;border-radius:var(--r);
+  background:var(--warn-soft);color:var(--warn);border-left:2px solid var(--warn)
+}
+.msgs li.good{background:var(--accent-soft);color:var(--accent-ink);border-left-color:var(--accent)}
+.toast{
+  position:fixed;left:50%;bottom:22px;transform:translateX(-50%);
+  background:var(--ink);color:var(--paper);padding:9px 16px;border-radius:100px;
+  font-size:13px;box-shadow:0 6px 22px rgba(0,0,0,.22);opacity:0;pointer-events:none;
+  transition:opacity .18s ease
+}
+.toast.show{opacity:1}
+@media (prefers-reduced-motion:reduce){ .toast{transition:none} }
+</style>
+
+<div class="app">
+  <header>
+    <h1>Xưởng Keycap MX</h1>
+    <span class="sub">Sinh keycap theo số đo bạn nhập &mdash; chân MX nhập trực tiếp mm, logo từ SVG/PNG, xuất 3MF 2 màu.</span>
+    <div class="presets" id="presets"></div>
+  </header>
+
+  <main>
+    <div class="rail">
+      <fieldset>
+        <legend>Thân cap</legend>
+        <div class="row"><label for="capW">Rộng đáy X</label><input id="capW" type="number" step="0.1"><span class="u">mm</span></div>
+        <div class="row"><label for="capD">Rộng đáy Y</label><input id="capD" type="number" step="0.1"><span class="u">mm</span></div>
+        <div class="row"><label for="topW">Mặt trên X</label><input id="topW" type="number" step="0.1"><span class="u">mm</span></div>
+        <div class="row"><label for="topD">Mặt trên Y</label><input id="topD" type="number" step="0.1"><span class="u">mm</span></div>
+        <div class="row"><label for="capH">Cao thân</label><input id="capH" type="number" step="0.1"><span class="u">mm</span></div>
+        <div class="row"><label for="cornerR">Bán kính góc</label><input id="cornerR" type="number" step="0.1"><span class="u">mm</span></div>
+        <div class="row"><label for="wall">Dày thành</label><input id="wall" type="number" step="0.1"><span class="u">mm</span></div>
+        <div class="row"><label for="cavityH">Sâu hốc switch</label><input id="cavityH" type="number" step="0.1"><span class="u">mm</span></div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Chân MX</legend>
+        <div class="row"><label for="stemSpan">Khe: ngang chữ thập</label><input id="stemSpan" type="number" step="0.01"><span class="u">mm</span></div>
+        <div class="row"><label for="stemArm">Khe: bề cánh</label><input id="stemArm" type="number" step="0.01"><span class="u">mm</span></div>
+        <div class="row"><label for="stemSlotDepth">Khe: độ sâu</label><input id="stemSlotDepth" type="number" step="0.1"><span class="u">mm</span></div>
+        <div class="row"><label for="stemDia">Đường kính ống</label><input id="stemDia" type="number" step="0.1"><span class="u">mm</span></div>
+        <div class="row"><label for="leadIn">Vát dẫn hướng</label><input id="leadIn" type="number" step="0.05"><span class="u">mm</span></div>
+        <div class="row"><label for="leadInH">Cao đoạn vát</label><input id="leadInH" type="number" step="0.1"><span class="u">mm</span></div>
+        <p class="note">Chân switch Cherry MX thật là <b>4.10 &times; 1.30 mm</b>. Khe nên rộng hơn 0.10&ndash;0.20 mm để bù co ngót khi in.</p>
+      </fieldset>
+
+      <fieldset>
+        <legend>Logo</legend>
+        <label class="file" tabindex="0">
+          <b id="fileName">Chọn file SVG hoặc PNG</b>
+          kéo thả cũng được &middot; nền trong suốt hoặc hình đen trên trắng
+          <input id="logoFile" type="file" accept=".svg,.png,.jpg,.jpeg,.webp,image/*">
+        </label>
+        <p class="note" id="logoInfo"></p>
+        <div class="row wide" style="margin-top:11px">
+          <div class="seg" id="logoMode">
+            <button type="button" data-v="raised">Nổi lên</button>
+            <button type="button" data-v="recessed">Khắc lõm</button>
+            <button type="button" data-v="through">Xuyên sáng</button>
+          </div>
+        </div>
+        <div class="row"><label for="logoSize">Bề rộng logo</label><input id="logoSize" type="number" step="0.1"><span class="u">mm</span></div>
+        <div class="row"><label for="logoDepth">Cao / sâu</label><input id="logoDepth" type="number" step="0.05"><span class="u">mm</span></div>
+        <div class="row wide"><label for="logoRot">Quay <span class="mono num" id="logoRotV">0&deg;</span></label>
+          <input id="logoRot" type="range" min="-180" max="180" step="1" value="0"></div>
+        <div class="row wide"><label for="logoDx">Dịch ngang <span class="mono num" id="logoDxV">0.0</span></label>
+          <input id="logoDx" type="range" min="-6" max="6" step="0.1" value="0"></div>
+        <div class="row wide"><label for="logoDy">Dịch dọc <span class="mono num" id="logoDyV">0.0</span></label>
+          <input id="logoDy" type="range" min="-6" max="6" step="0.1" value="0"></div>
+        <div class="row wide"><label for="thr">Ngưỡng tách hình <span class="mono num" id="thrV">0.50</span></label>
+          <input id="thr" type="range" min="0.1" max="0.9" step="0.05" value="0.5"></div>
+        <p class="note">Logo nhiều rãnh mảnh (kiểu logo ChatGPT) mà bị dính liền thành khối: kéo ngưỡng <b>lên</b> để rãnh mở ra.</p>
+        <label class="check"><input id="mirror" type="checkbox"> Lật ngược logo</label>
+        <button class="btn ghost" id="clearLogo" type="button">Bỏ logo</button>
+      </fieldset>
+
+      <fieldset>
+        <legend>Xuất file</legend>
+        <div class="colors">
+          <label><input id="capColor" type="color"> Màu thân</label>
+          <label><input id="logoColor" type="color"> Màu logo</label>
+        </div>
+        <label class="check"><input id="embedFilaments" type="checkbox" checked> Khai báo sẵn 2 filament trong file</label>
+        <div class="row wide" style="margin-bottom:9px;margin-top:9px">
+          <div class="seg" id="flip">
+            <button type="button" data-v="auto">Hướng tự động</button>
+            <button type="button" data-v="down">Úp xuống</button>
+            <button type="button" data-v="up">Ngửa lên</button>
+          </div>
+        </div>
+        <div class="row"><label for="count">Số cap trên khay</label><input id="count" type="number" step="1" min="1" max="40" value="1"><span class="u">cái</span></div>
+        <div class="row"><label for="plate">Khay in (vuông)</label><input id="plate" type="number" step="1" value="256"><span class="u">mm</span></div>
+        <button class="btn" id="dl3mf" type="button">Tải .3mf hai màu</button>
+        <button class="btn ghost" id="dlstl" type="button">Tải .stl</button>
+        <button class="btn ghost" id="dljson" type="button">Lưu thông số .json</button>
+        <p class="note" id="dlNote"></p>
+        <p class="note">Nếu Bambu hỏi có nạp cấu hình của project trong file hay không, chọn <b>có</b> —
+          đó chính là 2 slot filament. File không chứa profile máy in nên máy bạn đang chọn không bị đổi.</p>
+      </fieldset>
+    </div>
+
+    <div class="stage">
+      <div class="viewwrap">
+        <canvas id="view"></canvas>
+        <div class="readout" id="readout"></div>
+        <div class="hint">Kéo để quay &middot; lăn chuột để phóng</div>
+      </div>
+      <div class="lower">
+        <div class="pane">
+          <p class="eyebrow">Mặt cắt dọc qua tâm</p>
+          <canvas id="section"></canvas>
+        </div>
+        <div class="pane">
+          <p class="eyebrow">Kiểm tra thông số</p>
+          <table class="spec"><thead><tr><th>Hạng mục</th><th style="text-align:right">Giá trị</th><th>Trạng thái</th></tr></thead>
+            <tbody id="specBody"></tbody></table>
+          <ul class="msgs" id="msgs"></ul>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>

@@ -1,0 +1,1914 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Parametric MX keycap generator - type your own millimetres, drop in an SVG, export a two-colour 3MF.">
+<title>Xưởng Keycap MX</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  --paper:#E9EBE4; --panel:#F4F6F0; --sunk:#DFE3D9;
+  --ink:#191F1A; --ink2:#5B6357; --ink3:#868D80;
+  --rule:#C9CEC2; --grid:#D9DDD2;
+  --accent:#2E6F5E; --accent-ink:#1D4C40; --accent-soft:#D9E7E0;
+  --warn:#A2492A; --warn-soft:#F2E1D9;
+  --cap-face:#7E8A7C; --cap-lit:#A9B4A4; --cap-dark:#4E574C;
+  --logo-face:#D8DCCF; --logo-lit:#F2F4EC; --logo-dark:#A7AE9C;
+  --r:3px;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#141713; --panel:#1C201B; --sunk:#101310;
+    --ink:#E4E8DE; --ink2:#98A090; --ink3:#6E7568;
+    --rule:#2D332C; --grid:#232922;
+    --accent:#63B79B; --accent-ink:#8FD3BB; --accent-soft:#1C2B25;
+    --warn:#D9835E; --warn-soft:#32211A;
+    --cap-face:#5D6A5B; --cap-lit:#87947F; --cap-dark:#333B31;
+    --logo-face:#9FA895; --logo-lit:#CBD2BF; --logo-dark:#6E7566;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#141713; --panel:#1C201B; --sunk:#101310;
+  --ink:#E4E8DE; --ink2:#98A090; --ink3:#6E7568;
+  --rule:#2D332C; --grid:#232922;
+  --accent:#63B79B; --accent-ink:#8FD3BB; --accent-soft:#1C2B25;
+  --warn:#D9835E; --warn-soft:#32211A;
+  --cap-face:#5D6A5B; --cap-lit:#87947F; --cap-dark:#333B31;
+  --logo-face:#9FA895; --logo-lit:#CBD2BF; --logo-dark:#6E7566;
+}
+*{box-sizing:border-box}
+body{
+  margin:0; background:var(--paper); color:var(--ink);
+  font:400 14px/1.5 "IBM Plex Sans","Helvetica Neue",Arial,sans-serif;
+  -webkit-font-smoothing:antialiased;
+}
+h1,h2,h3,.eyebrow,.chip,button{font-family:"IBM Plex Sans Condensed","IBM Plex Sans",Arial,sans-serif}
+.mono,input[type=number],.num,td.n,.dim{font-family:"IBM Plex Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums}
+
+/* ---------- shell ---------- */
+.app{display:flex;flex-direction:column;min-height:100vh}
+header{
+  display:flex;flex-wrap:wrap;align-items:baseline;gap:8px 18px;
+  padding:14px 20px;border-bottom:1px solid var(--rule);background:var(--panel);
+}
+header h1{margin:0;font-size:19px;font-weight:700;letter-spacing:-.01em}
+header .sub{color:var(--ink2);font-size:12.5px;flex:1 1 260px}
+.presets{display:flex;flex-wrap:wrap;gap:6px}
+.chip{
+  border:1px solid var(--rule);background:var(--paper);color:var(--ink2);
+  padding:5px 11px;border-radius:100px;font-size:12px;font-weight:600;cursor:pointer;
+  letter-spacing:.01em;
+}
+.chip:hover{border-color:var(--accent);color:var(--accent)}
+.chip[aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:var(--panel)}
+
+main{display:grid;grid-template-columns:322px minmax(0,1fr);flex:1;min-height:0}
+@media (max-width:900px){ main{grid-template-columns:1fr} }
+
+/* ---------- parameter rail ---------- */
+.rail{
+  border-right:1px solid var(--rule);background:var(--panel);
+  padding:0 0 40px;overflow-y:auto;max-height:calc(100vh - 60px);
+}
+@media (max-width:900px){ .rail{max-height:none;border-right:0;border-top:1px solid var(--rule);order:2} }
+fieldset{border:0;border-bottom:1px solid var(--rule);margin:0;padding:15px 18px 17px}
+legend{
+  display:block;width:100%;padding:0;margin-bottom:11px;
+  font-family:"IBM Plex Sans Condensed",Arial,sans-serif;font-size:11px;font-weight:700;
+  letter-spacing:.13em;text-transform:uppercase;color:var(--ink3);
+}
+.row{display:grid;grid-template-columns:1fr 74px 20px;align-items:center;gap:8px;margin-bottom:7px}
+.row label{font-size:13px;color:var(--ink2)}
+.row .u{font-size:11px;color:var(--ink3)}
+input[type=number],select,input[type=text]{
+  width:100%;padding:5px 7px;font-size:13px;
+  border:1px solid var(--rule);border-radius:var(--r);
+  background:var(--paper);color:var(--ink);
+}
+input[type=number]{text-align:right}
+input:focus-visible,select:focus-visible,button:focus-visible,.chip:focus-visible,label.file:focus-within{
+  outline:2px solid var(--accent);outline-offset:1px
+}
+.row.wide{grid-template-columns:1fr}
+.slide{display:grid;grid-template-columns:1fr 60px;gap:8px;align-items:center}
+input[type=range]{width:100%;accent-color:var(--accent)}
+.seg{display:flex;gap:0;border:1px solid var(--rule);border-radius:var(--r);overflow:hidden}
+.seg button{
+  flex:1;padding:6px 4px;font-size:12px;font-weight:600;border:0;cursor:pointer;
+  background:var(--paper);color:var(--ink2);border-right:1px solid var(--rule);
+}
+.seg button:last-child{border-right:0}
+.seg button[aria-pressed=true]{background:var(--accent);color:var(--panel)}
+label.file{
+  display:block;border:1px dashed var(--rule);border-radius:var(--r);
+  padding:13px 10px;text-align:center;font-size:12.5px;color:var(--ink2);cursor:pointer;
+  background:var(--paper);
+}
+label.file:hover{border-color:var(--accent);color:var(--accent)}
+label.file input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+label.file b{display:block;font-weight:600;color:var(--ink);font-size:13px;margin-bottom:2px}
+.check{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink2);margin:9px 0 2px;cursor:pointer}
+.check input{accent-color:var(--accent);width:15px;height:15px}
+.btn{
+  display:block;width:100%;padding:9px 12px;margin-top:8px;cursor:pointer;
+  border:1px solid var(--accent);border-radius:var(--r);
+  background:var(--accent);color:var(--panel);font-size:13.5px;font-weight:600;letter-spacing:.01em;
+}
+.btn:hover{background:var(--accent-ink);border-color:var(--accent-ink)}
+.btn.ghost{background:transparent;color:var(--accent);}
+.btn.ghost:hover{background:var(--accent-soft);color:var(--accent-ink)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.note{font-size:11.5px;line-height:1.45;color:var(--ink3);margin:9px 0 0}
+.note b{color:var(--ink2)}
+.colors{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:2px 0 4px}
+.colors label{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--ink2)}
+.colors input[type=color]{
+  width:30px;height:24px;padding:0;border:1px solid var(--rule);border-radius:var(--r);
+  background:var(--paper);cursor:pointer;flex:none
+}
+
+/* ---------- stage ---------- */
+.stage{display:flex;flex-direction:column;min-width:0;background:var(--paper)}
+.viewwrap{position:relative;flex:1 1 auto;min-height:330px;background:var(--sunk)}
+canvas{display:block;width:100%;height:100%;touch-action:none}
+.hint{
+  position:absolute;left:12px;bottom:10px;font-size:11px;color:var(--ink3);
+  background:color-mix(in srgb, var(--sunk) 78%, transparent);padding:3px 7px;border-radius:100px;
+  pointer-events:none;
+}
+.readout{
+  position:absolute;right:12px;top:11px;text-align:right;font-size:11.5px;color:var(--ink2);
+  line-height:1.7;pointer-events:none;
+}
+.readout .big{display:block;font-size:15px;color:var(--ink);font-weight:500}
+.lower{display:grid;grid-template-columns:minmax(0,340px) minmax(0,1fr);border-top:1px solid var(--rule)}
+@media (max-width:760px){ .lower{grid-template-columns:1fr} }
+.pane{padding:14px 18px 18px;min-width:0}
+.pane+.pane{border-left:1px solid var(--rule)}
+@media (max-width:760px){ .pane+.pane{border-left:0;border-top:1px solid var(--rule)} }
+.eyebrow{
+  font-size:11px;font-weight:700;letter-spacing:.13em;text-transform:uppercase;
+  color:var(--ink3);margin:0 0 10px
+}
+#section{width:100%;height:246px;background:transparent}
+table.spec{width:100%;border-collapse:collapse;font-size:12.5px}
+table.spec th{
+  text-align:left;font-weight:600;font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;
+  color:var(--ink3);padding:0 8px 6px 0;border-bottom:1px solid var(--rule)
+}
+table.spec td{padding:5px 8px 5px 0;border-bottom:1px solid var(--grid);vertical-align:top}
+table.spec td.n{text-align:right;white-space:nowrap}
+.pill{
+  display:inline-block;padding:1px 7px 2px;border-radius:100px;font-size:10.5px;font-weight:600;
+  letter-spacing:.02em;white-space:nowrap
+}
+.pill.ok{background:var(--accent-soft);color:var(--accent-ink)}
+.pill.no{background:var(--warn-soft);color:var(--warn)}
+.msgs{list-style:none;margin:12px 0 0;padding:0;display:flex;flex-direction:column;gap:7px}
+.msgs li{
+  font-size:12.5px;line-height:1.45;padding:8px 10px;border-radius:var(--r);
+  background:var(--warn-soft);color:var(--warn);border-left:2px solid var(--warn)
+}
+.msgs li.good{background:var(--accent-soft);color:var(--accent-ink);border-left-color:var(--accent)}
+.toast{
+  position:fixed;left:50%;bottom:22px;transform:translateX(-50%);
+  background:var(--ink);color:var(--paper);padding:9px 16px;border-radius:100px;
+  font-size:13px;box-shadow:0 6px 22px rgba(0,0,0,.22);opacity:0;pointer-events:none;
+  transition:opacity .18s ease
+}
+.toast.show{opacity:1}
+@media (prefers-reduced-motion:reduce){ .toast{transition:none} }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header>
+    <h1>Xưởng Keycap MX</h1>
+    <span class="sub">Sinh keycap theo số đo bạn nhập &mdash; chân MX nhập trực tiếp mm, logo từ SVG/PNG, xuất 3MF 2 màu.</span>
+    <div class="presets" id="presets"></div>
+  </header>
+
+  <main>
+    <div class="rail">
+      <fieldset>
+        <legend>Thân cap</legend>
+        <div class="row"><label for="capW">Rộng đáy X</label><input id="capW" type="number" step="0.1"><span class="u">mm</span></div>
+        <div class="row"><label for="capD">Rộng đáy Y</label><input id="capD" type="number" step="0.1"><span class="u">mm</span></div>
+        <div class="row"><label for="topW">Mặt trên X</label><input id="topW" type="number" step="0.1"><span class="u">mm</span></div>
+        <div class="row"><label for="topD">Mặt trên Y</label><input id="topD" type="number" step="0.1"><span class="u">mm</span></div>
+        <div class="row"><label for="capH">Cao thân</label><input id="capH" type="number" step="0.1"><span class="u">mm</span></div>
+        <div class="row"><label for="cornerR">Bán kính góc</label><input id="cornerR" type="number" step="0.1"><span class="u">mm</span></div>
+        <div class="row"><label for="wall">Dày thành</label><input id="wall" type="number" step="0.1"><span class="u">mm</span></div>
+        <div class="row"><label for="cavityH">Sâu hốc switch</label><input id="cavityH" type="number" step="0.1"><span class="u">mm</span></div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Chân MX</legend>
+        <div class="row"><label for="stemSpan">Khe: ngang chữ thập</label><input id="stemSpan" type="number" step="0.01"><span class="u">mm</span></div>
+        <div class="row"><label for="stemArm">Khe: bề cánh</label><input id="stemArm" type="number" step="0.01"><span class="u">mm</span></div>
+        <div class="row"><label for="stemSlotDepth">Khe: độ sâu</label><input id="stemSlotDepth" type="number" step="0.1"><span class="u">mm</span></div>
+        <div class="row"><label for="stemDia">Đường kính ống</label><input id="stemDia" type="number" step="0.1"><span class="u">mm</span></div>
+        <div class="row"><label for="leadIn">Vát dẫn hướng</label><input id="leadIn" type="number" step="0.05"><span class="u">mm</span></div>
+        <div class="row"><label for="leadInH">Cao đoạn vát</label><input id="leadInH" type="number" step="0.1"><span class="u">mm</span></div>
+        <p class="note">Chân switch Cherry MX thật là <b>4.10 &times; 1.30 mm</b>. Khe nên rộng hơn 0.10&ndash;0.20 mm để bù co ngót khi in.</p>
+      </fieldset>
+
+      <fieldset>
+        <legend>Logo</legend>
+        <label class="file" tabindex="0">
+          <b id="fileName">Chọn file SVG hoặc PNG</b>
+          kéo thả cũng được &middot; nền trong suốt hoặc hình đen trên trắng
+          <input id="logoFile" type="file" accept=".svg,.png,.jpg,.jpeg,.webp,image/*">
+        </label>
+        <p class="note" id="logoInfo"></p>
+        <div class="row wide" style="margin-top:11px">
+          <div class="seg" id="logoMode">
+            <button type="button" data-v="raised">Nổi lên</button>
+            <button type="button" data-v="recessed">Khắc lõm</button>
+            <button type="button" data-v="through">Xuyên sáng</button>
+          </div>
+        </div>
+        <div class="row"><label for="logoSize">Bề rộng logo</label><input id="logoSize" type="number" step="0.1"><span class="u">mm</span></div>
+        <div class="row"><label for="logoDepth">Cao / sâu</label><input id="logoDepth" type="number" step="0.05"><span class="u">mm</span></div>
+        <div class="row wide"><label for="logoRot">Quay <span class="mono num" id="logoRotV">0&deg;</span></label>
+          <input id="logoRot" type="range" min="-180" max="180" step="1" value="0"></div>
+        <div class="row wide"><label for="logoDx">Dịch ngang <span class="mono num" id="logoDxV">0.0</span></label>
+          <input id="logoDx" type="range" min="-6" max="6" step="0.1" value="0"></div>
+        <div class="row wide"><label for="logoDy">Dịch dọc <span class="mono num" id="logoDyV">0.0</span></label>
+          <input id="logoDy" type="range" min="-6" max="6" step="0.1" value="0"></div>
+        <div class="row wide"><label for="thr">Ngưỡng tách hình <span class="mono num" id="thrV">0.50</span></label>
+          <input id="thr" type="range" min="0.1" max="0.9" step="0.05" value="0.5"></div>
+        <p class="note">Logo nhiều rãnh mảnh (kiểu logo ChatGPT) mà bị dính liền thành khối: kéo ngưỡng <b>lên</b> để rãnh mở ra.</p>
+        <label class="check"><input id="mirror" type="checkbox"> Lật ngược logo</label>
+        <button class="btn ghost" id="clearLogo" type="button">Bỏ logo</button>
+      </fieldset>
+
+      <fieldset>
+        <legend>Xuất file</legend>
+        <div class="colors">
+          <label><input id="capColor" type="color"> Màu thân</label>
+          <label><input id="logoColor" type="color"> Màu logo</label>
+        </div>
+        <label class="check"><input id="embedFilaments" type="checkbox" checked> Khai báo sẵn 2 filament trong file</label>
+        <div class="row wide" style="margin-bottom:9px;margin-top:9px">
+          <div class="seg" id="flip">
+            <button type="button" data-v="auto">Hướng tự động</button>
+            <button type="button" data-v="down">Úp xuống</button>
+            <button type="button" data-v="up">Ngửa lên</button>
+          </div>
+        </div>
+        <div class="row"><label for="count">Số cap trên khay</label><input id="count" type="number" step="1" min="1" max="40" value="1"><span class="u">cái</span></div>
+        <div class="row"><label for="plate">Khay in (vuông)</label><input id="plate" type="number" step="1" value="256"><span class="u">mm</span></div>
+        <button class="btn" id="dl3mf" type="button">Tải .3mf hai màu</button>
+        <button class="btn ghost" id="dlstl" type="button">Tải .stl</button>
+        <button class="btn ghost" id="dljson" type="button">Lưu thông số .json</button>
+        <p class="note" id="dlNote"></p>
+        <p class="note">Nếu Bambu hỏi có nạp cấu hình của project trong file hay không, chọn <b>có</b> —
+          đó chính là 2 slot filament. File không chứa profile máy in nên máy bạn đang chọn không bị đổi.</p>
+      </fieldset>
+    </div>
+
+    <div class="stage">
+      <div class="viewwrap">
+        <canvas id="view"></canvas>
+        <div class="readout" id="readout"></div>
+        <div class="hint">Kéo để quay &middot; lăn chuột để phóng</div>
+      </div>
+      <div class="lower">
+        <div class="pane">
+          <p class="eyebrow">Mặt cắt dọc qua tâm</p>
+          <canvas id="section"></canvas>
+        </div>
+        <div class="pane">
+          <p class="eyebrow">Kiểm tra thông số</p>
+          <table class="spec"><thead><tr><th>Hạng mục</th><th style="text-align:right">Giá trị</th><th>Trạng thái</th></tr></thead>
+            <tbody id="specBody"></tbody></table>
+          <ul class="msgs" id="msgs"></ul>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+"use strict";
+/* ---- src/geom.mjs ---- */
+// ---------------------------------------------------------------------------
+// keycap generator - core geometry.  No dependencies, runs in Node and browser.
+// Every builder returns a closed, watertight solid {V:[[x,y,z]..], F:[[a,b,c]..]}
+// with outward-facing normals, so the 3MF can hand the slicer separate parts and
+// never needs a CSG boolean.
+// ---------------------------------------------------------------------------
+
+// ----------------------------------------------------------------- 2D basics
+function signedArea(p) {
+  let s = 0;
+  for (let i = 0, n = p.length; i < n; i++) {
+    const a = p[i], b = p[(i + 1) % n];
+    s += a[0] * b[1] - b[0] * a[1];
+  }
+  return s / 2;
+}
+const ccw = (p) => (signedArea(p) < 0 ? p.slice().reverse() : p);
+const cw = (p) => (signedArea(p) > 0 ? p.slice().reverse() : p);
+
+/** Rounded rectangle centred on the origin, CCW. */
+function roundedRect(w, d, r, seg = 8) {
+  const hw = w / 2, hd = d / 2;
+  r = Math.max(0, Math.min(r, Math.min(hw, hd) - 1e-4));
+  if (r < 1e-4) return [[hw, -hd], [hw, hd], [-hw, hd], [-hw, -hd]];
+  const pts = [];
+  const corners = [[hw - r, -hd + r, -Math.PI / 2], [hw - r, hd - r, 0],
+                   [-hw + r, hd - r, Math.PI / 2], [-hw + r, -hd + r, Math.PI]];
+  for (const [cx, cy, a0] of corners)
+    for (let i = 0; i <= seg; i++) {
+      const a = a0 + (Math.PI / 2) * (i / seg);
+      pts.push([cx + r * Math.cos(a), cy + r * Math.sin(a)]);
+    }
+  return pts;
+}
+
+/** MX cross ("+") slot outline, CCW.  span = tip to tip, arm = bar width. */
+function crossPoly(span, arm) {
+  const h = span / 2, w = arm / 2;
+  return [[h, -w], [h, w], [w, w], [w, h], [-w, h], [-w, w],
+          [-h, w], [-h, -w], [-w, -w], [-w, -h], [w, -h], [w, -w]];
+}
+
+// ------------------------------------------------------- triangulation (2D)
+const EPS = 1e-9;
+function segIntersect(a, b, c, d) {
+  const d1 = cross3(a, b, c), d2 = cross3(a, b, d),
+        d3 = cross3(c, d, a), d4 = cross3(c, d, b);
+  return ((d1 > EPS && d2 < -EPS) || (d1 < -EPS && d2 > EPS)) &&
+         ((d3 > EPS && d4 < -EPS) || (d3 < -EPS && d4 > EPS));
+}
+const cross3 = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+
+/**
+ * Can `from` see `target` without crossing any edge?
+ * Rings are tested separately — concatenating them would invent an edge from the
+ * last point of one ring to the first point of the next.
+ */
+function visible(rings, from, target) {
+  for (const r of rings)
+    for (let i = 0; i < r.length; i++) {
+      const a = r[i], b = r[(i + 1) % r.length];
+      if (a === from || b === from || a === target || b === target) continue;
+      if (segIntersect(from, target, a, b)) return false;
+    }
+  return true;
+}
+
+/**
+ * Merge one hole ring into the outer ring with a double bridge.
+ * `rest` are the holes not bridged yet: the bridge must not cut through them
+ * either, or the merged ring self-intersects and a hole ends up filled.
+ */
+function bridgeHole(poly, hole, rest) {
+  let m = 0;
+  for (let i = 1; i < hole.length; i++) if (hole[i][0] > hole[m][0]) m = i;
+  const M = hole[m];
+  const rings = [poly, hole, ...rest];
+  let best = -1, bestD = Infinity;
+  // prefer bridging towards +x (the hole's own rightmost point faces open space),
+  // then fall back to any visible vertex
+  for (const rightOnly of [true, false]) {
+    for (let i = 0; i < poly.length; i++) {
+      const P = poly[i];
+      if (rightOnly && P[0] < M[0]) continue;
+      const dx = P[0] - M[0], dy = P[1] - M[1];
+      const dist = dx * dx + dy * dy;
+      if (dist >= bestD) continue;
+      if (!visible(rings, M, P)) continue;
+      best = i; bestD = dist;
+    }
+    if (best >= 0) break;
+  }
+  if (best < 0) return null;   // caller keeps the hole out rather than corrupting the ring
+  const rot = hole.slice(m).concat(hole.slice(0, m));
+  return [...poly.slice(0, best + 1), ...rot, rot[0], ...poly.slice(best)];
+}
+
+function pointInTri(p, a, b, c) {
+  const d1 = cross3(a, b, p), d2 = cross3(b, c, p), d3 = cross3(c, a, p);
+  return d1 >= -EPS && d2 >= -EPS && d3 >= -EPS;
+}
+const eq = (p, q) => Math.abs(p[0] - q[0]) < 1e-9 && Math.abs(p[1] - q[1]) < 1e-9;
+
+/**
+ * Ear clipping over an index ring.
+ *
+ * Bridging a hole into the outer ring duplicates two vertices (the bridge is a
+ * zero-width channel), and a naive ear test rejects every ear that geometrically
+ * contains the twin of one of its own corners — the clipper stalls and, if it
+ * then clips blindly, silently fills the hole.  So: ignore vertices that are
+ * geometric duplicates of the ear's corners, and when genuinely stuck, split the
+ * ring on a duplicate pair (or any valid diagonal) and recurse.
+ */
+function earClipIdx(poly, idx, out, depth = 0) {
+  if (idx.length < 3) return true;
+  let guard = 0;
+  const limit = idx.length * idx.length + 64;
+  while (idx.length > 3) {
+    if (guard++ > limit) break;
+    let clipped = false;
+    for (let i = 0; i < idx.length; i++) {
+      const ia = idx[(i - 1 + idx.length) % idx.length], ib = idx[i], ic = idx[(i + 1) % idx.length];
+      const a = poly[ia], b = poly[ib], c = poly[ic];
+      if (cross3(a, b, c) <= EPS) continue;                  // reflex or degenerate
+      let ok = true;
+      for (const j of idx) {
+        if (j === ia || j === ib || j === ic) continue;
+        const p = poly[j];
+        if (eq(p, a) || eq(p, b) || eq(p, c)) continue;       // bridge twin
+        if (pointInTri(p, a, b, c)) { ok = false; break; }
+      }
+      if (!ok) continue;
+      out.push([ia, ib, ic]);
+      idx.splice(i, 1);
+      clipped = true;
+      break;
+    }
+    if (clipped) continue;
+
+    if (depth > 24) return false;
+    // stuck: split on a duplicated vertex pair, else on any valid diagonal
+    const n = idx.length;
+    let cut = null;
+    for (let i = 0; i < n && !cut; i++)
+      for (let j = i + 2; j < n; j++) {
+        if (i === 0 && j === n - 1) continue;
+        if (eq(poly[idx[i]], poly[idx[j]])) { cut = [i, j]; break; }
+      }
+    if (!cut) {
+      for (let i = 0; i < n && !cut; i++)
+        for (let j = i + 2; j < n; j++) {
+          if (i === 0 && j === n - 1) continue;
+          if (validDiagonal(poly, idx, i, j)) { cut = [i, j]; break; }
+        }
+    }
+    if (!cut) return false;
+    const [i, j] = cut;
+    const left = idx.slice(i, j + 1);
+    const right = idx.slice(j).concat(idx.slice(0, i + 1));
+    const okL = earClipIdx(poly, left, out, depth + 1);
+    const okR = earClipIdx(poly, right, out, depth + 1);
+    return okL && okR;
+  }
+  // Never drop a triangle: a degenerate one is harmless to a slicer, an open
+  // surface is not.  If the clipper stalled with more than three vertices left,
+  // close the remainder with a fan and let triStats.failed surface it.
+  if (idx.length === 3) { out.push([idx[0], idx[1], idx[2]]); return true; }
+  if (idx.length > 3) {
+    for (let i = 1; i + 1 < idx.length; i++) out.push([idx[0], idx[i], idx[i + 1]]);
+    return false;
+  }
+  return true;
+}
+
+/** Is the segment idx[i]-idx[j] a diagonal that stays inside the ring? */
+function validDiagonal(poly, idx, i, j) {
+  const n = idx.length, A = poly[idx[i]], B = poly[idx[j]];
+  if (eq(A, B)) return false;
+  for (let k = 0; k < n; k++) {
+    const k2 = (k + 1) % n;
+    if (k === i || k === j || k2 === i || k2 === j) continue;
+    if (segIntersect(A, B, poly[idx[k]], poly[idx[k2]])) return false;
+  }
+  // midpoint must be inside the ring
+  const mx = (A[0] + B[0]) / 2, my = (A[1] + B[1]) / 2;
+  let inside = false;
+  for (let k = 0, l = n - 1; k < n; l = k++) {
+    const p = poly[idx[k]], q = poly[idx[l]];
+    if ((p[1] > my) !== (q[1] > my) &&
+        mx < ((q[0] - p[0]) * (my - p[1])) / (q[1] - p[1]) + p[0]) inside = !inside;
+  }
+  return inside;
+}
+
+const triStats = { dropped: 0, failed: 0 };
+function resetTriStats() { triStats.dropped = 0; triStats.failed = 0; }
+
+function earClip(poly) {
+  const out = [];
+  if (!earClipIdx(poly, [...Array(poly.length).keys()], out)) triStats.failed++;
+  return out;
+}
+
+/**
+ * Triangulate one outer ring with any number of hole rings.
+ * Returns {pts, tris} where tris index into pts and wind CCW.
+ */
+function triangulate(outer, holes = []) {
+  let poly = ccw(outer).map((p) => [p[0], p[1]]);
+  const hs = holes.map((h) => cw(h).map((p) => [p[0], p[1]]));
+  const maxX = (r) => r.reduce((m, p) => (p[0] > m ? p[0] : m), -Infinity);
+  hs.sort((a, b) => maxX(b) - maxX(a));
+  let dropped = 0;
+  for (let k = 0; k < hs.length; k++) {
+    const next = bridgeHole(poly, hs[k], hs.slice(k + 1));
+    if (next) poly = next; else dropped++;
+  }
+  triStats.dropped += dropped;
+  return { pts: poly, tris: earClip(poly) };
+}
+
+// ------------------------------------------------------------- mesh builder
+class Mesh {
+  constructor() { this.V = []; this.F = []; }
+  vert(x, y, z) { this.V.push([x, y, z]); return this.V.length - 1; }
+  tri(a, b, c) { this.F.push([a, b, c]); }
+  ring(pts, z) { return pts.map((p) => this.vert(p[0], p[1], z)); }
+
+  /** Side wall between two equal-length rings.  `out` flips the facing. */
+  loft(lo, hi, out = true) {
+    const n = lo.length;
+    for (let i = 0; i < n; i++) {
+      const j = (i + 1) % n;
+      if (out) { this.tri(lo[i], lo[j], hi[j]); this.tri(lo[i], hi[j], hi[i]); }
+      else     { this.tri(lo[i], hi[j], lo[j]); this.tri(lo[i], hi[i], hi[j]); }
+    }
+  }
+
+  /**
+   * Flat horizontal face at `z` from an outer ring plus holes.
+   * `up` true -> normal +Z, false -> normal -Z.
+   */
+  face(outer, holes, z, up) {
+    const { pts, tris } = triangulate(outer, holes);
+    const ids = pts.map((p) => this.vert(p[0], p[1], z));
+    for (const [a, b, c] of tris) up ? this.tri(ids[a], ids[b], ids[c]) : this.tri(ids[a], ids[c], ids[b]);
+  }
+
+  merge(other) {
+    const o = this.V.length;
+    for (const v of other.V) this.V.push(v);
+    for (const f of other.F) this.F.push([f[0] + o, f[1] + o, f[2] + o]);
+  }
+  /**
+   * Fuse coincident vertices so the solid is properly manifold (each builder
+   * emits its own ring copies, which would otherwise leave every shared edge
+   * split and force the slicer to repair the mesh).
+   */
+  weld(tol = 1e-4) {
+    const map = new Map(), remap = new Int32Array(this.V.length);
+    const V = [];
+    const q = (v) => Math.round(v / tol);
+    for (let i = 0; i < this.V.length; i++) {
+      const v = this.V[i], k = `${q(v[0])},${q(v[1])},${q(v[2])}`;
+      let j = map.get(k);
+      if (j === undefined) { j = V.length; V.push(v); map.set(k, j); }
+      remap[i] = j;
+    }
+    const F = [];
+    for (const f of this.F) {
+      const a = remap[f[0]], b = remap[f[1]], c = remap[f[2]];
+      if (a !== b && b !== c && a !== c) F.push([a, b, c]);
+    }
+    this.V = V; this.F = F;
+    return this;
+  }
+
+  /** Copy rotated 180° about X and lifted so the model sits on z=0..H. */
+  flipped(H) {
+    const m = new Mesh();
+    m.V = this.V.map((v) => [v[0], -v[1], H - v[2]]);
+    m.F = this.F.map((f) => [f[0], f[1], f[2]]);   // proper rotation -> winding kept
+    return m;
+  }
+
+  get bounds() {
+    const lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
+    for (const v of this.V) for (let k = 0; k < 3; k++) {
+      if (v[k] < lo[k]) lo[k] = v[k];
+      if (v[k] > hi[k]) hi[k] = v[k];
+    }
+    return { lo, hi };
+  }
+}
+
+// ------------------------------------------------------------------ the cap
+/**
+ * Hollow tapered cap shell.  Sits on z=0, flat top at z=capH.
+ * The cavity is a straight-walled well of depth cavityH; everything above it is solid.
+ */
+function buildCapShell(p) {
+  const seg = p.cornerSeg ?? 10;
+  const m = new Mesh();
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const t = p.cavityH / p.capH;
+
+  const outLo = roundedRect(p.capW, p.capD, p.cornerR, seg);
+  const outHi = roundedRect(p.topW, p.topD, Math.max(0.2, p.cornerR * (p.topW / p.capW)), seg);
+
+  // The cavity follows the outer taper instead of running straight up, so the
+  // wall keeps its thickness all the way.  A straight cavity under a tapered
+  // shell pinches the wall to nothing near the roof — the slicer then prints no
+  // wall there at all and the skirt comes off the cap as a separate ring.
+  const rIn = Math.max(0.3, p.cornerR - p.wall * 0.5);
+  const innLo = roundedRect(p.capW - 2 * p.wall, p.capD - 2 * p.wall, rIn, seg);
+  const innHi = roundedRect(
+    Math.max(1, lerp(p.capW, p.topW, t) - 2 * p.wall),
+    Math.max(1, lerp(p.capD, p.topD, t) - 2 * p.wall),
+    Math.max(0.2, rIn * 0.9), seg);
+
+  const rOutLo = m.ring(outLo, 0);
+  const rOutHi = m.ring(outHi, p.capH);
+  m.loft(rOutLo, rOutHi, true);          // outer skirt
+  m.face(outHi, [], p.capH, true);       // flat top
+
+  const rInLo = m.ring(innLo, 0);
+  const rInHi = m.ring(innHi, p.cavityH);
+  m.loft(rInLo, rInHi, false);           // cavity wall (normals point inward)
+  m.face(innHi, [], p.cavityH, false);   // cavity ceiling, facing down
+  m.face(outLo, [innLo], 0, false);      // bottom rim, facing down
+  return m;
+}
+
+// ----------------------------------------------------------------- the stem
+/**
+ * MX stem: round tube on z=0 carrying a cross slot.  Reaches `top` so that it
+ * welds into the cap roof when the slicer unions the parts.
+ *   span/arm   cross slot, tip-to-tip and bar width
+ *   depth      slot depth from z=0
+ *   dia        tube outer diameter
+ *   leadIn     extra span+arm for the first leadInH mm (push-on chamfer, 0 = none)
+ */
+function buildStem(p) {
+  const m = new Mesh();
+  const n = p.tubeSeg ?? 64;
+  const R = p.stemDia / 2;
+  const top = p.stemTop;
+  const circle = [];
+  for (let i = 0; i < n; i++) {
+    const a = (2 * Math.PI * i) / n;
+    circle.push([R * Math.cos(a), R * Math.sin(a)]);
+  }
+  const cLo = m.ring(circle, 0), cHi = m.ring(circle, top);
+  m.loft(cLo, cHi, true);
+  m.face(circle, [], top, true);
+
+  const small = crossPoly(p.stemSpan, p.stemArm);
+  const lead = p.leadIn > 0 ? p.leadInH : 0;
+
+  if (lead > 0) {
+    const big = crossPoly(p.stemSpan + 2 * p.leadIn, p.stemArm + 2 * p.leadIn);
+    m.face(circle, [big], 0, false);                 // bottom rim around the wide entry
+    const bLo = m.ring(big, 0), bHi = m.ring(big, lead);
+    m.loft(bLo, bHi, false);                         // wide entry wall
+    m.face(big, [small], lead, false);               // step shoulder, facing down
+    const sLo = m.ring(small, lead), sHi = m.ring(small, p.stemSlotDepth);
+    m.loft(sLo, sHi, false);
+    m.face(small, [], p.stemSlotDepth, false);       // slot ceiling
+  } else {
+    m.face(circle, [small], 0, false);
+    const sLo = m.ring(small, 0), sHi = m.ring(small, p.stemSlotDepth);
+    m.loft(sLo, sHi, false);
+    m.face(small, [], p.stemSlotDepth, false);
+  }
+  return m;
+}
+
+// ------------------------------------------------------------ legend prisms
+/**
+ * Extrude a set of rings into a prism between z0 and z1.
+ * `rings` = [{outer:[[x,y]..], holes:[[[x,y]..]..]}, ..]
+ */
+function buildPrism(rings, z0, z1) {
+  const m = new Mesh();
+  for (const r of rings) {
+    const outer = ccw(r.outer), holes = (r.holes || []).map(cw);
+    m.face(outer, holes, z1, true);
+    m.face(outer, holes, z0, false);
+    const oLo = m.ring(outer, z0), oHi = m.ring(outer, z1);
+    m.loft(oLo, oHi, true);
+    for (const h of holes) {
+      const hLo = m.ring(h, z0), hHi = m.ring(h, z1);
+      m.loft(hLo, hHi, true);   // hole rings are CW, so the same winding faces inward
+    }
+  }
+  return m;
+}
+
+// -------------------------------------------------------- ring transforming
+function transformRings(rings, { scale = 1, rot = 0, dx = 0, dy = 0, mirror = false }) {
+  const c = Math.cos((rot * Math.PI) / 180), s = Math.sin((rot * Math.PI) / 180);
+  const f = (p) => {
+    let x = p[0] * scale * (mirror ? -1 : 1), y = p[1] * scale;
+    return [x * c - y * s + dx, x * s + y * c + dy];
+  };
+  return rings.map((r) => ({
+    outer: mirror ? r.outer.map(f).reverse() : r.outer.map(f),
+    holes: (r.holes || []).map((h) => (mirror ? h.map(f).reverse() : h.map(f))),
+  }));
+}
+
+/** Bounding box of a ring set. */
+function ringsBounds(rings) {
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const r of rings) for (const p of r.outer) {
+    if (p[0] < x0) x0 = p[0]; if (p[0] > x1) x1 = p[0];
+    if (p[1] < y0) y0 = p[1]; if (p[1] > y1) y1 = p[1];
+  }
+  return { x0, y0, x1, y1, w: x1 - x0, h: y1 - y0 };
+}
+
+/* ---- src/vectorize.mjs ---- */
+// ---------------------------------------------------------------------------
+// Turn a coverage raster (alpha from an SVG or PNG drawn to a canvas) into
+// closed polygon rings, ready to extrude.  Marching squares on the antialiased
+// alpha field gives smooth sub-pixel contours; Douglas-Peucker trims them down.
+// ---------------------------------------------------------------------------
+
+const KEY = (x, y) => `${Math.round(x * 4096)},${Math.round(y * 4096)}`;
+
+/**
+ * field: Float32Array/Array of w*h coverage values 0..1 (row major, y down)
+ * Returns loops in pixel coordinates with y still pointing down.
+ */
+function marchingSquares(field, w, h, iso = 0.5) {
+  // pad with 0 so shapes touching the border still close
+  const W = w + 2, H = h + 2;
+  const f = new Float32Array(W * H);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) f[(y + 1) * W + (x + 1)] = field[y * w + x];
+  const at = (i, j) => f[j * W + i];
+
+  const segs = [];
+  const lerp = (i0, j0, i1, j1) => {
+    const v0 = at(i0, j0), v1 = at(i1, j1);
+    let t = (iso - v0) / (v1 - v0);
+    if (!isFinite(t)) t = 0.5;
+    t = Math.max(0, Math.min(1, t));
+    return [i0 + (i1 - i0) * t - 1, j0 + (j1 - j0) * t - 1];
+  };
+  for (let j = 0; j < H - 1; j++) for (let i = 0; i < W - 1; i++) {
+    const bl = at(i, j) >= iso, br = at(i + 1, j) >= iso,
+          tr = at(i + 1, j + 1) >= iso, tl = at(i, j + 1) >= iso;
+    const code = (bl ? 1 : 0) | (br ? 2 : 0) | (tr ? 4 : 0) | (tl ? 8 : 0);
+    if (code === 0 || code === 15) continue;
+    const L = () => lerp(i, j, i, j + 1);
+    const B = () => lerp(i, j, i + 1, j);
+    const R = () => lerp(i + 1, j, i + 1, j + 1);
+    const T = () => lerp(i, j + 1, i + 1, j + 1);
+    const push = (a, b) => segs.push([a, b]);
+    switch (code) {
+      case 1: case 14: push(L(), B()); break;
+      case 2: case 13: push(B(), R()); break;
+      case 3: case 12: push(L(), R()); break;
+      case 4: case 11: push(R(), T()); break;
+      case 6: case 9:  push(B(), T()); break;
+      case 7: case 8:  push(L(), T()); break;
+      case 5:  push(L(), B()); push(R(), T()); break;
+      case 10: push(B(), R()); push(T(), L()); break;
+    }
+  }
+
+  // chain segments into closed loops through shared endpoints
+  const adj = new Map();
+  const add = (p, q) => {
+    const k = KEY(p[0], p[1]);
+    let e = adj.get(k);
+    if (!e) { e = { p, n: [] }; adj.set(k, e); }
+    e.n.push(q);
+  };
+  for (const [a, b] of segs) { add(a, b); add(b, a); }
+
+  // Walk the point graph into loops.  Where a thin feature pinches, one point
+  // can carry four segments instead of two; pick the straightest continuation
+  // so the two strands passing through stay separate instead of cross-linking.
+  const seen = new Set();
+  const loops = [];
+  for (const [k0] of adj) {
+    if (seen.has(k0)) continue;
+    const loop = [];
+    let curK = k0, prevK = null, prevPt = null, guard = 0;
+    while (guard++ < adj.size * 4) {
+      const e = adj.get(curK);
+      if (!e || seen.has(curK)) break;
+      seen.add(curK);
+      loop.push(e.p);
+      let nextK = null, bestScore = -Infinity;
+      for (const q of e.n) {
+        const qk = KEY(q[0], q[1]);
+        if (qk === prevK || seen.has(qk)) continue;
+        if (!prevPt) { nextK = qk; break; }
+        const ax = e.p[0] - prevPt[0], ay = e.p[1] - prevPt[1];
+        const bx = q[0] - e.p[0], by = q[1] - e.p[1];
+        const la = Math.hypot(ax, ay) || 1, lb = Math.hypot(bx, by) || 1;
+        const sc = (ax * bx + ay * by) / (la * lb);
+        if (sc > bestScore) { bestScore = sc; nextK = qk; }
+      }
+      if (!nextK) break;
+      prevK = curK; prevPt = e.p; curK = nextK;
+    }
+    if (loop.length >= 3) loops.push(loop);
+  }
+  return loops;
+}
+
+/** Douglas-Peucker on a closed ring. */
+function simplify(ring, tol) {
+  if (ring.length < 4) return ring;
+  const keep = new Uint8Array(ring.length);
+  keep[0] = 1;
+  const stack = [[0, ring.length - 1]];
+  const d2 = (p, a, b) => {
+    const dx = b[0] - a[0], dy = b[1] - a[1];
+    const L = dx * dx + dy * dy;
+    if (L < 1e-12) return (p[0] - a[0]) ** 2 + (p[1] - a[1]) ** 2;
+    let t = ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / L;
+    t = Math.max(0, Math.min(1, t));
+    const qx = a[0] + t * dx - p[0], qy = a[1] + t * dy - p[1];
+    return qx * qx + qy * qy;
+  };
+  keep[ring.length - 1] = 1;
+  while (stack.length) {
+    const [i0, i1] = stack.pop();
+    let worst = -1, wd = tol * tol;
+    for (let i = i0 + 1; i < i1; i++) {
+      const d = d2(ring[i], ring[i0], ring[i1]);
+      if (d > wd) { wd = d; worst = i; }
+    }
+    if (worst > 0) { keep[worst] = 1; stack.push([i0, worst], [worst, i1]); }
+  }
+  const out = [];
+  for (let i = 0; i < ring.length; i++) if (keep[i]) out.push(ring[i]);
+  return out.length >= 3 ? out : ring;
+}
+
+const area2 = (p) => {
+  let s = 0;
+  for (let i = 0, n = p.length; i < n; i++) { const a = p[i], b = p[(i + 1) % n]; s += a[0] * b[1] - b[0] * a[1]; }
+  return s / 2;
+};
+function inside(pt, ring) {
+  let c = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const a = ring[i], b = ring[j];
+    if ((a[1] > pt[1]) !== (b[1] > pt[1]) &&
+        pt[0] < ((b[0] - a[0]) * (pt[1] - a[1])) / (b[1] - a[1]) + a[0]) c = !c;
+  }
+  return c;
+}
+
+/**
+ * Group loops into {outer, holes} by nesting depth, drop specks, and map
+ * pixel space -> millimetres with Y flipped so the legend reads right side up.
+ */
+function loopsToRings(loops, { pxPerMM = 1, minArea = 0.02 } = {}) {
+  const rings = loops.map((l) => ({ pts: l, a: Math.abs(area2(l)) }))
+    .filter((r) => r.a / (pxPerMM * pxPerMM) >= minArea)
+    .sort((a, b) => b.a - a.a)
+    .map((r) => r.pts);
+
+  const depth = rings.map((r, i) => {
+    let d = 0;
+    for (let j = 0; j < rings.length; j++) if (j !== i && inside(r[0], rings[j])) d++;
+    return d;
+  });
+  const out = [];
+  rings.forEach((r, i) => {
+    if (depth[i] % 2 === 0) out.push({ outer: r, holes: [], _i: i });
+  });
+  rings.forEach((r, i) => {
+    if (depth[i] % 2 === 0) return;
+    let best = null, bestA = Infinity;
+    for (const o of out) {
+      if (depth[o._i] !== depth[i] - 1) continue;
+      if (!inside(r[0], rings[o._i])) continue;
+      const a = Math.abs(area2(rings[o._i]));
+      if (a < bestA) { bestA = a; best = o; }
+    }
+    (best || out[0])?.holes.push(r);
+  });
+  const conv = (p) => [p[0] / pxPerMM, -p[1] / pxPerMM];
+  return out.map((r) => ({ outer: r.outer.map(conv), holes: r.holes.map((h) => h.map(conv)) }));
+}
+
+/** Full pipeline: coverage raster -> mm rings. */
+function rasterToRings(field, w, h, { pxPerMM = 1, tolPx = 0.35, minArea = 0.02, iso = 0.5 } = {}) {
+  const loops = marchingSquares(field, w, h, iso).map((l) => simplify(l, tolPx));
+  return loopsToRings(loops, { pxPerMM, minArea });
+}
+
+/* ---- src/export3mf.mjs ---- */
+// ---------------------------------------------------------------------------
+// Minimal 3MF writer in the flavour Bambu Studio / OrcaSlicer expect.
+// Stored (uncompressed) zip - no dependencies, works in Node and the browser.
+// Parts are handed over separately (cap / stem / legend), so the slicer performs
+// the union and we never need a boolean here.
+// ---------------------------------------------------------------------------
+
+const CRC = (() => {
+  const t = new Uint32Array(256);
+  for (let n = 0; n < 256; n++) {
+    let c = n;
+    for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+    t[n] = c >>> 0;
+  }
+  return t;
+})();
+function crc32(buf) {
+  let c = 0xffffffff;
+  for (let i = 0; i < buf.length; i++) c = CRC[(c ^ buf[i]) & 0xff] ^ (c >>> 8);
+  return (c ^ 0xffffffff) >>> 0;
+}
+const utf8 = (s) => new TextEncoder().encode(s);
+
+/** files: [{name, data:Uint8Array}] -> zip bytes (STORE). */
+function zipStore(files) {
+  const chunks = [], central = [];
+  let offset = 0;
+  const u16 = (v) => [v & 0xff, (v >>> 8) & 0xff];
+  const u32 = (v) => [v & 0xff, (v >>> 8) & 0xff, (v >>> 16) & 0xff, (v >>> 24) & 0xff];
+  for (const f of files) {
+    const name = utf8(f.name), crc = crc32(f.data), n = f.data.length;
+    const local = [...u32(0x04034b50), ...u16(20), ...u16(0), ...u16(0), ...u16(0), ...u16(0),
+                   ...u32(crc), ...u32(n), ...u32(n), ...u16(name.length), ...u16(0)];
+    chunks.push(new Uint8Array(local), name, f.data);
+    central.push({ name, crc, n, offset });
+    offset += local.length + name.length + n;
+  }
+  const cdir = [];
+  for (const c of central) {
+    cdir.push(...u32(0x02014b50), ...u16(20), ...u16(20), ...u16(0), ...u16(0), ...u16(0), ...u16(0),
+              ...u32(c.crc), ...u32(c.n), ...u32(c.n), ...u16(c.name.length),
+              ...u16(0), ...u16(0), ...u16(0), ...u16(0), ...u32(0), ...u32(c.offset));
+    cdir.push(...c.name);
+  }
+  const cd = new Uint8Array(cdir);
+  const end = new Uint8Array([...u32(0x06054b50), ...u16(0), ...u16(0),
+    ...u16(central.length), ...u16(central.length), ...u32(cd.length), ...u32(offset), ...u16(0)]);
+  let total = 0;
+  for (const c of chunks) total += c.length;
+  const out = new Uint8Array(total + cd.length + end.length);
+  let o = 0;
+  for (const c of chunks) { out.set(c, o); o += c.length; }
+  out.set(cd, o); o += cd.length;
+  out.set(end, o);
+  return out;
+}
+
+const f6 = (v) => (Math.abs(v) < 1e-9 ? '0' : v.toFixed(6).replace(/\.?0+$/, ''));
+
+function meshXml(id, mesh) {
+  const L = [`  <object id="${id}" type="model">`, '   <mesh>', '    <vertices>'];
+  for (const v of mesh.V) L.push(`     <vertex x="${f6(v[0])}" y="${f6(v[1])}" z="${f6(v[2])}"/>`);
+  L.push('    </vertices>', '    <triangles>');
+  for (const t of mesh.F) L.push(`     <triangle v1="${t[0]}" v2="${t[1]}" v3="${t[2]}"/>`);
+  L.push('    </triangles>', '   </mesh>', '  </object>');
+  return L.join('\n');
+}
+
+/**
+ * parts: [{ id, name, mesh, extruder, subtype }]  subtype: normal_part | negative_part
+ * copies: [{x, y}] plate positions in mm (one object instance per entry)
+ * filaments: ['#rrggbb', ...] — when given, a minimal project_settings.config
+ *   declares that many filament slots.  Without it a 3MF inherits whatever the
+ *   open project has, and a project with one filament flattens the part that
+ *   asks for filament 2 back to filament 1: the legend loses its colour.
+ *   Only the filament arrays are written — no printer or print preset — so the
+ *   machine profile the user already has selected is left alone.
+ */
+function build3mf({ parts, copies, title = 'Keycap', filaments = null }) {
+  const PARTS_PATH = '/3D/Objects/parts.model';
+  const partsModel = [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    '<model unit="millimeter" xml:lang="en-US" xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02"' +
+      ' xmlns:BambuStudio="http://schemas.bambulab.com/package/2021"' +
+      ' xmlns:p="http://schemas.microsoft.com/3dmanufacturing/production/2015/06" requiredextensions="p">',
+    ' <metadata name="BambuStudio:3mfVersion">1</metadata>',
+    ' <resources>',
+    ...parts.map((p) => meshXml(p.id, p.mesh)),
+    ' </resources>',
+    ' <build/>',
+    '</model>', ''
+  ].join('\n');
+
+  const objs = [], items = [];
+  copies.forEach((c, i) => {
+    const oid = 100 + i;
+    objs.push(
+      `  <object id="${oid}" type="model">`,
+      '   <components>',
+      ...parts.map((p) => `    <component p:path="${PARTS_PATH}" objectid="${p.id}" transform="1 0 0 0 1 0 0 0 1 0 0 0" />`),
+      '   </components>',
+      '  </object>');
+    items.push(`  <item objectid="${oid}" transform="1 0 0 0 1 0 0 0 1 ${f6(c.x)} ${f6(c.y)} 0" printable="1" />`);
+  });
+
+  const mainModel = [
+    "<?xml version='1.0' encoding='UTF-8'?>",
+    '<model xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02"' +
+      ' xmlns:p="http://schemas.microsoft.com/3dmanufacturing/production/2015/06"' +
+      ' unit="millimeter" xml:lang="en-US" requiredextensions="p"' +
+      ' xmlns:BambuStudio="http://schemas.bambulab.com/package/2021">',
+    ' <metadata name="Application">Keycap Generator</metadata>',
+    ' <metadata name="BambuStudio:3mfVersion">1</metadata>',
+    ` <metadata name="Title">${title}</metadata>`,
+    ' <resources>', ...objs, ' </resources>',
+    ' <build>', ...items, ' </build>',
+    '</model>', ''
+  ].join('\n');
+
+  const settings = [
+    '<?xml version="1.0" encoding="UTF-8"?>', '<config>',
+    ...copies.flatMap((c, i) => {
+      const oid = 100 + i;
+      return [
+        `  <object id="${oid}">`,
+        `    <metadata key="name" value="${title}"/>`,
+        '    <metadata key="extruder" value="1"/>',
+        ...parts.flatMap((p) => [
+          `    <part id="${p.id}" subtype="${p.subtype}">`,
+          `      <metadata key="name" value="${p.name}"/>`,
+          ...(p.extruder ? [`      <metadata key="extruder" value="${p.extruder}"/>`] : []),
+          '      <metadata key="matrix" value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>',
+          `      <mesh_stat face_count="${p.mesh.F.length}" edges_fixed="0" degenerate_facets="0" facets_removed="0" facets_reversed="0" backwards_edges="0"/>`,
+          '    </part>'
+        ]),
+        '  </object>'
+      ];
+    }),
+    '  <plate>',
+    '    <metadata key="plater_id" value="1"/>',
+    '    <metadata key="plater_name" value=""/>',
+    '    <metadata key="locked" value="false"/>',
+    '    <metadata key="filament_map_mode" value="Auto For Flush"/>',
+    ...copies.map((c, i) =>
+      ['    <model_instance>',
+       `      <metadata key="object_id" value="${100 + i}"/>`,
+       '      <metadata key="instance_id" value="0"/>',
+       '    </model_instance>'].join('\n')),
+    '  </plate>',
+    '</config>', ''
+  ].join('\n');
+
+  const extra = [];
+  if (filaments && filaments.length > 1) {
+    const n = filaments.length;
+    const rep = (v) => Array(n).fill(v);
+    extra.push({ name: 'Metadata/project_settings.config', data: utf8(JSON.stringify({
+      from: 'project',
+      filament_colour: filaments,
+      filament_multi_colour: filaments,
+      filament_type: rep('PLA'),
+      filament_ids: rep('GFA00'),
+      filament_diameter: rep('1.75'),
+      filament_density: rep('1.24'),
+      filament_soluble: rep('0'),
+      filament_is_support: rep('0'),
+    }, null, 1)) });
+    extra.push({ name: 'Metadata/slice_info.config', data: utf8(
+      '<?xml version="1.0" encoding="UTF-8"?>\n<config>\n  <header>\n' +
+      '    <header_item key="X-BBL-Client-Type" value="slicer"/>\n' +
+      '    <header_item key="X-BBL-Client-Version" value="02.00.00.00"/>\n' +
+      '  </header>\n</config>\n') });
+  }
+
+  return zipStore([
+    { name: '[Content_Types].xml', data: utf8(
+      '<?xml version="1.0" encoding="UTF-8"?>\n<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">\n' +
+      ' <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>\n' +
+      ' <Default Extension="model" ContentType="application/vnd.ms-package.3dmanufacturing-3dmodel+xml"/>\n' +
+      ' <Default Extension="png" ContentType="image/png"/>\n</Types>\n') },
+    { name: '_rels/.rels', data: utf8(
+      '<?xml version="1.0" encoding="UTF-8"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">\n' +
+      ' <Relationship Target="/3D/3dmodel.model" Id="rel-1" Type="http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel"/>\n</Relationships>\n') },
+    { name: '3D/3dmodel.model', data: utf8(mainModel) },
+    { name: '3D/_rels/3dmodel.model.rels', data: utf8(
+      '<?xml version="1.0" encoding="UTF-8"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">\n' +
+      ` <Relationship Target="${PARTS_PATH}" Id="rel-2" Type="http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel"/>\n</Relationships>\n`) },
+    { name: '3D/Objects/parts.model', data: utf8(partsModel) },
+    { name: 'Metadata/model_settings.config', data: utf8(settings) },
+    ...extra,
+  ]);
+}
+
+/** Binary STL of one or more meshes concatenated (slicers union overlapping solids). */
+function buildStl(meshes, name = 'keycap') {
+  let n = 0;
+  for (const m of meshes) n += m.F.length;
+  const buf = new ArrayBuffer(84 + n * 50);
+  const dv = new DataView(buf);
+  new Uint8Array(buf, 0, 80).set(utf8(name.slice(0, 79)));
+  dv.setUint32(80, n, true);
+  let o = 84;
+  for (const m of meshes) for (const t of m.F) {
+    const a = m.V[t[0]], b = m.V[t[1]], c = m.V[t[2]];
+    const u = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], v = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
+    let nx = u[1] * v[2] - u[2] * v[1], ny = u[2] * v[0] - u[0] * v[2], nz = u[0] * v[1] - u[1] * v[0];
+    const L = Math.hypot(nx, ny, nz) || 1;
+    for (const val of [nx / L, ny / L, nz / L, ...a, ...b, ...c]) { dv.setFloat32(o, val, true); o += 4; }
+    dv.setUint16(o, 0, true); o += 2;
+  }
+  return new Uint8Array(buf);
+}
+
+/* ---- src/build.mjs ---- */
+
+
+const PRESETS = {
+  clicker22: {
+    label: 'Fidget clicker 22.4 mm',
+    capW: 22.4, capD: 22.4, topW: 20.1, topD: 20.1, capH: 9.0, cornerR: 1.4,
+    wall: 2.2, cavityH: 4.0,
+    stemSpan: 4.20, stemArm: 1.30, stemSlotDepth: 4.0, stemDia: 5.6, leadIn: 0, leadInH: 0.6,
+    logoSize: 17.8, logoDepth: 1.0, logoMode: 'raised',
+    capColor: '#C05A2B', logoColor: '#F5F3EE',
+  },
+  mx1u: {
+    label: 'Bàn phím 1u — 18.0 mm',
+    capW: 18.0, capD: 18.0, topW: 13.2, topD: 13.2, capH: 9.5, cornerR: 1.0,
+    wall: 1.5, cavityH: 6.4,
+    stemSpan: 4.25, stemArm: 1.36, stemSlotDepth: 4.0, stemDia: 5.6, leadIn: 0.15, leadInH: 0.6,
+    logoSize: 10.0, logoDepth: 0.8, logoMode: 'recessed',
+    capColor: '#1C1C1E', logoColor: '#F2F2F2',
+  },
+  // Measured switch pitch on a 5-switch fidget clicker body:
+  // 18.062 / 18.062 / 17.959 mm.  Sized off the tightest pair (17.959) minus
+  // 0.46 mm so adjacent caps still have a gap after the first layers spread.
+  clicker5: {
+    label: 'Clicker 5 switch (pitch 17.96)',
+    capW: 17.5, capD: 17.5, topW: 12.5, topD: 12.5, capH: 9.5, cornerR: 1.2,
+    wall: 1.6, cavityH: 6.4,
+    stemSpan: 4.25, stemArm: 1.36, stemSlotDepth: 4.5, stemDia: 5.6, leadIn: 0.15, leadInH: 0.6,
+    logoSize: 10.5, logoDepth: 0.8, logoMode: 'recessed',
+    capColor: '#F5820B', logoColor: '#FFFFFF',
+  },
+};
+
+/** Fit the legend rings onto the cap top: scale to logoSize, then rotate/offset. */
+function placeLogo(rings, p) {
+  const b = ringsBounds(rings);
+  const span = Math.max(b.w, b.h) || 1;
+  const scale = p.logoSize / span;
+  const cx = (b.x0 + b.x1) / 2, cy = (b.y0 + b.y1) / 2;
+  const centred = rings.map((r) => ({
+    outer: r.outer.map((q) => [q[0] - cx, q[1] - cy]),
+    holes: (r.holes || []).map((h) => h.map((q) => [q[0] - cx, q[1] - cy])),
+  }));
+  return transformRings(centred, {
+    scale, rot: p.logoRot || 0, dx: p.logoDx || 0, dy: p.logoDy || 0, mirror: !!p.mirror,
+  });
+}
+
+/** Returns { parts, meshes, info } — parts feed the 3MF, meshes feed the preview. */
+function buildKeycap(p, logoRings) {
+  resetTriStats();
+  const stemTop = Math.max(p.stemSlotDepth, p.cavityH) + 0.3;
+  const cap = buildCapShell(p).weld();
+  const stem = buildStem({ ...p, stemTop }).weld();
+
+  const parts = [
+    { id: 1, name: 'Cap', mesh: cap, extruder: 1, subtype: 'normal_part' },
+    { id: 2, name: `MX stem ${p.stemSpan}x${p.stemArm}`, mesh: stem, extruder: 1, subtype: 'normal_part' },
+  ];
+  const preview = [{ mesh: cap, kind: 'cap' }, { mesh: stem, kind: 'cap' }];
+  const info = { stemTop, roofT: p.capH - p.cavityH };
+
+  if (logoRings && logoRings.length) {
+    const rings = placeLogo(logoRings, p);
+    if (p.logoMode === 'raised') {
+      const prism = buildPrism(rings, p.capH - 0.01, p.capH + p.logoDepth).weld();
+      parts.push({ id: 3, name: 'Legend', mesh: prism, extruder: 2, subtype: 'normal_part' });
+      preview.push({ mesh: prism, kind: 'logo' });
+    } else {
+      const roofT = p.capH - p.cavityH;
+      const d = p.logoMode === 'through' ? roofT : Math.min(p.logoDepth, roofT - 0.4);
+      const z0 = p.capH - d;
+      const cut = buildPrism(rings, z0 - (p.logoMode === 'through' ? 0.4 : 0), p.capH + 0.3).weld();
+      const fill = buildPrism(rings, z0, p.capH).weld();
+      parts.push({ id: 3, name: 'Legend cutout', mesh: cut, subtype: 'negative_part' });
+      parts.push({ id: 4, name: 'Legend', mesh: fill, extruder: 2, subtype: 'normal_part' });
+      // flush with the cap's top face -> nudge the preview copy so the depth
+      // buffer has a winner (the exported geometry stays exact)
+      preview.push({ mesh: fill, kind: 'logo', zBias: 0.012 });
+      info.legendDepth = d;
+    }
+  }
+  info.holesDropped = triStats.dropped;
+  info.triFailed = triStats.failed;
+  return { parts, preview, info };
+}
+
+/**
+ * Printing orientation.
+ *
+ * The cap is modelled sitting on its open rim, which is also the worst way to
+ * print it: the switch cavity's roof becomes one ~300 mm² internal bridge and
+ * the slicer asks for supports — which would end up inside the cavity and the
+ * stem slot, wrecking the fit.  Turned top-face-down the same cap has almost no
+ * overhang (~4 mm²), the top surface comes out glossy off the build plate, and
+ * a recessed legend prints as the first layers, which is exactly what makes a
+ * clean two-colour inlay.  A raised legend cannot be flipped — it would be
+ * under the plate — so that mode stays face-up.
+ */
+function orientForPrint(parts, logoMode, flip = 'auto') {
+  const down = flip === 'down' || (flip === 'auto' && logoMode !== 'raised');
+  if (!down) return { parts, down: false };
+  let H = -Infinity;
+  for (const p of parts) if (p.subtype === 'normal_part') H = Math.max(H, p.mesh.bounds.hi[2]);
+  return { parts: parts.map((p) => ({ ...p, mesh: p.mesh.flipped(H) })), down: true };
+}
+
+/** Grid of copies centred on the plate. */
+function layout(count, capW, capD, plate = 256) {
+  const cols = Math.ceil(Math.sqrt(count));
+  const rows = Math.ceil(count / cols);
+  const sx = capW + 3, sy = capD + 3;
+  const out = [];
+  for (let i = 0; i < count; i++) {
+    const c = i % cols, r = Math.floor(i / cols);
+    out.push({ x: plate / 2 + (c - (cols - 1) / 2) * sx, y: plate / 2 + (r - (rows - 1) / 2) * sy });
+  }
+  return out;
+}
+
+function exportKeycap3mf(p, logoRings, count = 1, plate = 256) {
+  const { parts } = orientForPrint(buildKeycap(p, logoRings).parts, p.logoMode, p.flip);
+  const twoColour = parts.some((x) => x.extruder === 2);
+  return build3mf({
+    parts,
+    copies: layout(count, p.capW, p.capD, plate),
+    title: p.name || 'Keycap',
+    filaments: p.embedFilaments !== false && twoColour
+      ? [p.capColor || '#F5820B', p.logoColor || '#FFFFFF'] : null,
+  });
+}
+
+function exportKeycapStl(p, logoRings) {
+  const { parts } = orientForPrint(buildKeycap(p, logoRings).parts, p.logoMode, p.flip);
+  return buildStl(parts.filter((x) => x.subtype === 'normal_part').map((x) => x.mesh), p.name || 'keycap');
+}
+
+const DEFAULT_LOGO=[{"outer":[[5.8,-10],[6.27,-9.974],[6.735,-9.895],[7.187,-9.764],[7.622,-9.584],[8.035,-9.356],[8.419,-9.084],[8.77,-8.77],[9.084,-8.419],[9.356,-8.035],[9.584,-7.622],[9.764,-7.187],[9.895,-6.735],[9.974,-6.27],[10,-5.8],[10,5.8],[9.974,6.27],[9.895,6.735],[9.764,7.187],[9.584,7.622],[9.356,8.035],[9.084,8.419],[8.77,8.77],[8.419,9.084],[8.035,9.356],[7.622,9.584],[7.187,9.764],[6.735,9.895],[6.27,9.974],[5.8,10],[-5.8,10],[-6.27,9.974],[-6.735,9.895],[-7.187,9.764],[-7.622,9.584],[-8.035,9.356],[-8.419,9.084],[-8.77,8.77],[-9.084,8.419],[-9.356,8.035],[-9.584,7.622],[-9.764,7.187],[-9.895,6.735],[-9.974,6.27],[-10,5.8],[-10,-5.8],[-9.974,-6.27],[-9.895,-6.735],[-9.764,-7.187],[-9.584,-7.622],[-9.356,-8.035],[-9.084,-8.419],[-8.77,-8.77],[-8.419,-9.084],[-8.035,-9.356],[-7.622,-9.584],[-7.187,-9.764],[-6.735,-9.895],[-6.27,-9.974],[-5.8,-10]],"holes":[[[-4.4,-7.2],[-4.765,-7.176],[-5.125,-7.105],[-5.472,-6.987],[-5.8,-6.825],[-6.105,-6.621],[-6.38,-6.38],[-6.621,-6.105],[-6.825,-5.8],[-6.987,-5.472],[-7.105,-5.125],[-7.176,-4.765],[-7.2,-4.4],[-7.2,4.4],[-7.176,4.765],[-7.105,5.125],[-6.987,5.472],[-6.825,5.8],[-6.621,6.105],[-6.38,6.38],[-6.105,6.621],[-5.8,6.825],[-5.472,6.987],[-5.125,7.105],[-4.765,7.176],[-4.4,7.2],[4.4,7.2],[4.765,7.176],[5.125,7.105],[5.472,6.987],[5.8,6.825],[6.105,6.621],[6.38,6.38],[6.621,6.105],[6.825,5.8],[6.987,5.472],[7.105,5.125],[7.176,4.765],[7.2,4.4],[7.2,-4.4],[7.176,-4.765],[7.105,-5.125],[6.987,-5.472],[6.825,-5.8],[6.621,-6.105],[6.38,-6.38],[6.105,-6.621],[5.8,-6.825],[5.472,-6.987],[5.125,-7.105],[4.765,-7.176],[4.4,-7.2]]]},{"outer":[[4.8,-1.55],[4.8,1.55],[1.55,1.55],[1.55,4.8],[-1.55,4.8],[-1.55,1.55],[-4.8,1.55],[-4.8,-1.55],[-1.55,-1.55],[-1.55,-4.8],[1.55,-4.8],[1.55,-1.55]],"holes":[]}];
+
+// ===========================================================================
+// Xưởng Keycap MX — UI layer.  Uses the tested core (geom / vectorize /
+// export3mf / build) which the bundler inlines above this file.
+// ===========================================================================
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const MX_POST_SPAN = 4.10, MX_POST_ARM = 1.30;
+
+  // downloads: a published artifact may only save allow-listed extensions,
+  // and .3mf / .stl are not on that list — the offline copy handles those.
+  const SANDBOXED = !!(window.claude && typeof window.claude.use === 'function');
+
+  const NUM_KEYS = ['capW','capD','topW','topD','capH','cornerR','wall','cavityH',
+    'stemSpan','stemArm','stemSlotDepth','stemDia','leadIn','leadInH',
+    'logoSize','logoDepth','logoRot','logoDx','logoDy','count','plate'];
+
+  let P = { ...PRESETS[Object.keys(PRESETS)[0]], logoRot: 0, logoDx: 0, logoDy: 0, mirror: false,
+            count: 1, plate: 256, flip: 'auto', embedFilaments: true, name: 'Keycap' };
+  let logoRings = DEFAULT_LOGO;      // rings in arbitrary units; placeLogo rescales
+  let rawField = null;               // {f, w, h} coverage raster of an uploaded file
+  let logoName = 'Hình mẫu có sẵn';
+  let logoSlug = 'keycap';
+  let logoInfo = '';
+  let built = null;
+
+  // ------------------------------------------------------------- presets
+  const presetBox = $('presets');
+  Object.entries(PRESETS).forEach(([k, v]) => {
+    const b = document.createElement('button');
+    b.className = 'chip'; b.type = 'button'; b.textContent = v.label;
+    b.dataset.k = k; b.setAttribute('aria-pressed', k === Object.keys(PRESETS)[0]);
+    b.onclick = () => {
+      const { label, ...vals } = v;
+      P = { ...P, ...vals };
+      [...presetBox.children].forEach((c) => c.setAttribute('aria-pressed', c === b));
+      syncInputs(); rebuild();
+    };
+    presetBox.appendChild(b);
+  });
+
+  // -------------------------------------------------------------- inputs
+  function syncInputs() {
+    for (const k of NUM_KEYS) if ($(k)) $(k).value = P[k];
+    $('mirror').checked = !!P.mirror;
+    $('logoRotV').textContent = P.logoRot + '°';
+    $('logoDxV').textContent = Number(P.logoDx).toFixed(1);
+    $('logoDyV').textContent = Number(P.logoDy).toFixed(1);
+    [...$('logoMode').children].forEach((b) =>
+      b.setAttribute('aria-pressed', b.dataset.v === P.logoMode));
+    [...$('flip').children].forEach((b) =>
+      b.setAttribute('aria-pressed', b.dataset.v === P.flip));
+    $('capColor').value = P.capColor || '#7E8A7C';
+    $('logoColor').value = P.logoColor || '#F2F4EC';
+    $('embedFilaments').checked = P.embedFilaments !== false;
+    $('logoDepth').previousElementSibling.textContent =
+      P.logoMode === 'raised' ? 'Cao logo' : P.logoMode === 'through' ? 'Sâu (tự động)' : 'Sâu khắc';
+    $('logoDepth').disabled = P.logoMode === 'through';
+  }
+
+  for (const k of NUM_KEYS) {
+    const el = $(k);
+    if (!el) continue;
+    el.addEventListener('input', () => {
+      const v = parseFloat(el.value);
+      if (!isFinite(v)) return;
+      P[k] = v;
+      if (k === 'logoRot') $('logoRotV').textContent = v + '°';
+      if (k === 'logoDx') $('logoDxV').textContent = v.toFixed(1);
+      if (k === 'logoDy') $('logoDyV').textContent = v.toFixed(1);
+      clearPreset(); rebuild();
+    });
+  }
+  $('mirror').addEventListener('change', () => { P.mirror = $('mirror').checked; rebuild(); });
+  for (const k of ['capColor', 'logoColor'])
+    $(k).addEventListener('input', () => { P[k] = $(k).value; upload(); render(); });
+  $('embedFilaments').addEventListener('change', () => { P.embedFilaments = $('embedFilaments').checked; });
+  [...$('logoMode').children].forEach((b) => {
+    b.onclick = () => { P.logoMode = b.dataset.v; syncInputs(); rebuild(); };
+  });
+  [...$('flip').children].forEach((b) => {
+    b.onclick = () => { P.flip = b.dataset.v; syncInputs(); rebuild(); };
+  });
+  $('thr').addEventListener('input', () => {
+    $('thrV').textContent = parseFloat($('thr').value).toFixed(2);
+    revectorize(); rebuild();
+  });
+  function clearPreset() { [...presetBox.children].forEach((c) => c.setAttribute('aria-pressed', false)); }
+
+  // ---------------------------------------------------------- logo input
+  $('logoFile').addEventListener('change', (e) => { if (e.target.files[0]) takeFile(e.target.files[0]); });
+  $('clearLogo').onclick = () => {
+    rawField = null; logoRings = null; logoName = ''; logoSlug = 'keycap'; logoInfo = '';
+    $('fileName').textContent = 'Chọn file SVG hoặc PNG';
+    $('logoInfo').textContent = '';
+    rebuild();
+  };
+  const stage = document.querySelector('.stage');
+  ['dragover', 'dragenter'].forEach((t) => stage.addEventListener(t, (e) => { e.preventDefault(); }));
+  stage.addEventListener('drop', (e) => {
+    e.preventDefault();
+    const f = e.dataTransfer?.files?.[0];
+    if (f) takeFile(f);
+  });
+
+  const RASTER = 1100;   // long side of the coverage raster, in pixels
+
+  /**
+   * Rasterise the upload into a coverage field.
+   *
+   * SVG needs care: icon files usually carry only viewBox="0 0 24 24", and a
+   * browser is free to rasterise an <img> SVG at that intrinsic size and then
+   * upscale — which melts every thin channel (the ChatGPT knot turns into a
+   * blob).  So for SVG we rewrite width/height on the root tag first, which
+   * forces rasterisation at full size everywhere.
+   */
+  async function fileToField(file) {
+    const isSvg = /svg/i.test(file.type) || /\.svg$/i.test(file.name);
+    let url = null, srcNote = '', revoke = null;
+
+    if (isSvg) {
+      const txt = await file.text();
+      const m = /<svg\b[^>]*?>/i.exec(txt);
+      if (m) {
+        const tag = m[0];
+        const vb = /viewBox\s*=\s*["']\s*(-?[\d.]+)[\s,]+(-?[\d.]+)[\s,]+([\d.]+)[\s,]+([\d.]+)/i.exec(tag);
+        const wA = /\bwidth\s*=\s*["']([\d.]+)/i.exec(tag);
+        const hA = /\bheight\s*=\s*["']([\d.]+)/i.exec(tag);
+        let vw = vb ? +vb[3] : wA ? +wA[1] : 0;
+        let vh = vb ? +vb[4] : hA ? +hA[1] : 0;
+        if (!(vw > 0 && vh > 0)) { vw = 100; vh = 100; }
+        const k = RASTER / Math.max(vw, vh);
+        const TW = Math.max(8, Math.round(vw * k)), TH = Math.max(8, Math.round(vh * k));
+        let attrs = tag.replace(/^<svg/i, '').replace(/\/?>$/, '')
+          .replace(/\s(width|height)\s*=\s*("[^"]*"|'[^']*'|[\d.]+)/gi, '');
+        if (!vb) attrs += ` viewBox="0 0 ${vw} ${vh}"`;
+        const patched = txt.slice(0, m.index) +
+          `<svg${attrs} width="${TW}" height="${TH}">` + txt.slice(m.index + tag.length);
+        url = URL.createObjectURL(new Blob([patched], { type: 'image/svg+xml' }));
+        srcNote = `SVG ${vw}×${vh} → raster ${TW}×${TH} px`;
+      }
+    }
+    if (!url) { url = URL.createObjectURL(file); }
+    revoke = url;
+
+    const img = new Image();
+    await new Promise((res, rej) => {
+      img.onload = res; img.onerror = () => rej(new Error('load')); img.src = url;
+    });
+    const nw = img.naturalWidth || RASTER, nh = img.naturalHeight || RASTER;
+    let k = RASTER / Math.max(nw, nh);
+    if (!isSvg) {
+      k = Math.min(k, 6);                       // upscaling a bitmap adds no detail
+      srcNote = `ảnh ${nw}×${nh} px`;
+    }
+    const cw = Math.max(8, Math.round(nw * k)), ch = Math.max(8, Math.round(nh * k));
+    const c = document.createElement('canvas');
+    c.width = cw + 8; c.height = ch + 8;
+    const g = c.getContext('2d', { willReadFrequently: true });
+    g.imageSmoothingQuality = 'high';
+    g.drawImage(img, 4, 4, cw, ch);
+    URL.revokeObjectURL(revoke);
+
+    const d = g.getImageData(0, 0, c.width, c.height).data;
+    let hasAlpha = false;
+    for (let i = 3; i < d.length; i += 4) if (d[i] < 250) { hasAlpha = true; break; }
+    const f = new Float32Array(c.width * c.height);
+    for (let p = 0, i = 0; i < d.length; i += 4, p++) {
+      if (hasAlpha) f[p] = d[i + 3] / 255;
+      else f[p] = 1 - (0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]) / 255;
+    }
+    return { f, w: c.width, h: c.height, srcNote, small: !isSvg && Math.max(nw, nh) < 256 };
+  }
+
+  async function takeFile(file) {
+    try {
+      rawField = await fileToField(file);
+      logoName = file.name; logoSlug = file.name;
+      $('fileName').textContent = file.name;
+      revectorize();
+      if (!logoRings || !logoRings.length) toast('Không tách được hình — thử kéo thanh “ngưỡng tách hình”');
+      else if (rawField.small) toast('Ảnh nguồn nhỏ hơn 256 px nên chi tiết mảnh sẽ bị nhoè — dùng SVG hoặc ảnh lớn hơn');
+      rebuild();
+    } catch (err) {
+      toast('Không đọc được file này. SVG cần có viewBox hoặc width/height.');
+    }
+  }
+
+  function revectorize() {
+    if (!rawField) { logoInfo = ''; return; }
+    const iso = parseFloat($('thr').value);
+    logoRings = rasterToRings(rawField.f, rawField.w, rawField.h,
+      { pxPerMM: 1, tolPx: 0.35, minArea: 24, iso });
+    const holes = logoRings.reduce((s, r) => s + r.holes.length, 0);
+    const pts = logoRings.reduce((s, r) => s + r.outer.length +
+      r.holes.reduce((a, h) => a + h.length, 0), 0);
+    logoInfo = `${rawField.srcNote} · ${logoRings.length} vùng, ${holes} lỗ, ${pts} điểm`;
+    $('logoInfo').textContent = logoInfo;
+  }
+
+  // ------------------------------------------------------------- rebuild
+  let raf = 0;
+  function rebuild() {
+    cancelAnimationFrame(raf);
+    raf = requestAnimationFrame(() => {
+      try { built = buildKeycap(P, logoRings); }
+      catch (e) { toast('Thông số không dựng được hình — kiểm tra lại các ô'); return; }
+      drawSpec(); drawSection(); upload(); render();
+    });
+  }
+
+  // ------------------------------------------------------ derived numbers
+  function derived() {
+    const inW = P.capW - 2 * P.wall, inD = P.capD - 2 * P.wall;
+    // cavity follows the outer taper, so the wall is constant and the cavity's
+    // narrowest point is its ceiling
+    const t = P.cavityH / P.capH;
+    const capTopW = Math.min(P.capW + (P.topW - P.capW) * t, P.capD + (P.topD - P.capD) * t);
+    const cavTop = capTopW - 2 * P.wall;
+    const roofT = P.capH - P.cavityH;
+    const stemWall = (P.stemDia - P.stemSpan) / 2;
+    const clr = P.stemSpan - MX_POST_SPAN;
+    const armClr = P.stemArm - MX_POST_ARM;
+    const legDepth = P.logoMode === 'through' ? roofT
+      : P.logoMode === 'recessed' ? Math.min(P.logoDepth, roofT - 0.4) : P.logoDepth;
+    const totalH = P.capH + (P.logoMode === 'raised' && logoRings ? P.logoDepth : 0);
+    const faceDown = P.flip === 'down' || (P.flip === 'auto' && P.logoMode !== 'raised');
+    return { inW, inD, roofT, stemWall, clr, armClr, legDepth, totalH, faceDown, cavTop,
+             stemTop: Math.max(P.stemSlotDepth, P.cavityH) + 0.3 };
+  }
+
+  // ------------------------------------------------------------ spec table
+  function drawSpec() {
+    const d = derived();
+    const rows = [];
+    const add = (label, val, ok, hint) => rows.push({ label, val, ok, hint });
+
+    add('Khe chữ thập', `${P.stemSpan.toFixed(2)} × ${P.stemArm.toFixed(2)}`,
+      d.clr >= 0.05 && d.clr <= 0.40 && d.armClr >= -0.05 && d.armClr <= 0.30,
+      d.clr < 0.05 ? `Khe chỉ hơn chân switch ${d.clr.toFixed(2)} mm — in ra gần như chắc chắn không lắp vào được. Tăng “ngang chữ thập” lên tối thiểu 4.20.`
+      : d.clr > 0.40 ? `Khe rộng hơn chân switch ${d.clr.toFixed(2)} mm — cap sẽ lỏng và lắc. Giảm về khoảng 4.20–4.30.`
+      : d.armClr > 0.30 ? 'Bề cánh rộng quá, cap sẽ xoay nhẹ trên switch.' : null);
+
+    add('Dư so với chân MX', `${d.clr >= 0 ? '+' : ''}${d.clr.toFixed(2)} mm`, d.clr >= 0.05 && d.clr <= 0.40, null);
+    add('Thành chân', `${d.stemWall.toFixed(2)} mm`, d.stemWall >= 0.50,
+      d.stemWall < 0.50 ? `Thành ống chân chỉ ${d.stemWall.toFixed(2)} mm — mỏng hơn 2 đường đùn, dễ nứt. Tăng đường kính ống lên ≥ ${(P.stemSpan + 1.0).toFixed(1)} mm.` : null);
+    add('Sâu khe', `${P.stemSlotDepth.toFixed(1)} mm`, P.stemSlotDepth >= 3.4,
+      P.stemSlotDepth < 3.4 ? 'Khe nông hơn 3.4 mm thì chân switch không ăn hết, cap dễ tuột.' : null);
+    add('Hốc switch', `${d.inW.toFixed(1)} × ${d.inD.toFixed(1)} × ${P.cavityH.toFixed(1)}`,
+      d.inW >= 13.4 && d.inD >= 13.4 && P.cavityH >= 3.6,
+      (d.inW < 13.4 || d.inD < 13.4) ? `Hốc rộng ${Math.min(d.inW, d.inD).toFixed(1)} mm, nhỏ hơn vỏ trên switch MX (~13.4 mm) — cap sẽ chặn vào vỏ switch. Giảm “dày thành”.`
+      : P.cavityH < 3.6 ? 'Hốc cạn hơn 3.6 mm, cap chạm vỏ switch trước khi ăn hết chân.' : null);
+    add('Thành vỏ cap', `${P.wall.toFixed(2)} mm đều`, P.wall >= 0.8,
+      P.wall < 0.8 ? `Thành ${P.wall.toFixed(2)} mm mỏng hơn 2 đường đùn — vỏ cap sẽ rỗng và bong khỏi mái khi in.` : null);
+    add('Hốc ở đỉnh', `${d.cavTop.toFixed(1)} mm`, d.cavTop >= 9.5 && d.cavTop > P.stemDia + 2,
+      d.cavTop < 9.5
+        ? `Hốc thu còn ${d.cavTop.toFixed(1)} mm ở đỉnh, vỏ trên switch chạm vào. Giảm “sâu hốc switch”, giảm “dày thành”, hoặc nới “mặt trên”.`
+        : d.cavTop <= P.stemDia + 2 ? 'Hốc ở đỉnh quá hẹp so với ống chân — chân gần chạm vách hốc.' : null);
+    add('Mái cap', `${d.roofT.toFixed(1)} mm`, d.roofT >= 1.2 && (P.logoMode === 'raised' || d.legDepth >= 0.3),
+      d.roofT < 1.2 ? 'Mái cap mỏng hơn 1.2 mm — bấm nhiều sẽ lún.'
+      : (P.logoMode !== 'raised' && d.legDepth < 0.3) ? 'Mái cap quá mỏng để khắc logo sâu như vậy. Giảm “sâu khắc” hoặc giảm “sâu hốc switch”.' : null);
+
+    if (logoRings) {
+      const room = Math.min(P.topW, P.topD);
+      add('Logo trên mặt trên', `${P.logoSize.toFixed(1)} / ${room.toFixed(1)} mm`,
+        P.logoSize <= room - 0.8,
+        P.logoSize > room - 0.8 ? `Logo ${P.logoSize.toFixed(1)} mm tràn khỏi mặt trên ${room.toFixed(1)} mm. Giảm còn ≤ ${(room - 0.8).toFixed(1)} mm.` : null);
+    }
+    add('Hướng in khi xuất', d.faceDown ? 'úp mặt trên xuống' : 'ngửa mặt trên lên',
+      d.faceDown || P.logoMode === 'raised',
+      !d.faceDown && P.logoMode !== 'raised'
+        ? 'In ngửa thì mái hốc switch phải bắc cầu qua khoang rỗng (~300 mm²) — chọn “Hướng tự động” hoặc “Úp xuống”.'
+        : !d.faceDown
+          ? 'Logo nổi buộc phải in ngửa, nên mái hốc switch là một cầu ~300 mm². Slicer sẽ báo “floating cantilever” — ' +
+            'ĐỪNG bật support, nó sẽ chui vào hốc switch và khe chân, hỏng độ vừa. Bấm bỏ qua cảnh báo, hoặc đổi sang “Khắc lõm” để hết hẳn.'
+          : null);
+    add('Kích thước tổng', `${P.capW.toFixed(1)} × ${P.capD.toFixed(1)} × ${d.totalH.toFixed(1)}`, true, null);
+
+    $('specBody').innerHTML = rows.map((r) =>
+      `<tr><td>${r.label}</td><td class="n">${r.val}</td>` +
+      `<td><span class="pill ${r.ok ? 'ok' : 'no'}">${r.ok ? 'đạt' : 'xem lại'}</span></td></tr>`).join('');
+
+    const bad = rows.filter((r) => r.hint);
+    const tinfo = built && built.info;
+    if (tinfo && (tinfo.holesDropped || tinfo.triFailed))
+      bad.unshift({ hint: `Logo có ${tinfo.holesDropped || 0} lỗ không ghép được và ${tinfo.triFailed || 0} vùng tam giác hoá lỗi — ` +
+        'hình quá rối ở cỡ này. Tăng "bề rộng logo" hoặc dùng file logo đơn giản hơn.' });
+    $('msgs').innerHTML = bad.length
+      ? bad.map((r) => `<li>${r.hint}</li>`).join('')
+      : '<li class="good">Mọi thông số nằm trong khoảng lắp được với switch Cherry MX.</li>';
+
+    const tri = built ? built.parts.reduce((s, p) => s + p.mesh.F.length, 0) : 0;
+    $('readout').innerHTML =
+      `<span class="big mono">${P.capW.toFixed(1)} × ${P.capD.toFixed(1)} × ${d.totalH.toFixed(1)} mm</span>` +
+      `<span class="mono">khe ${P.stemSpan.toFixed(2)} × ${P.stemArm.toFixed(2)} mm</span><br>` +
+      `<span class="mono">${tri.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '\u2009')} tam giác</span>`;
+  }
+
+  // -------------------------------------------------- section drawing (2D)
+  const secCv = $('section'), secCtx = secCv.getContext('2d');
+
+  /** x-intervals where the placed legend rings cross the section plane y=0. */
+  function legendSpansAtY0() {
+    if (!logoRings) return [];
+    const rings = placeLogo(logoRings, P);
+    const xs = [];
+    for (const r of rings) for (const ring of [r.outer, ...(r.holes || [])]) {
+      for (let i = 0; i < ring.length; i++) {
+        const a = ring[i], b = ring[(i + 1) % ring.length];
+        if ((a[1] > 0) !== (b[1] > 0)) xs.push(a[0] + ((0 - a[1]) / (b[1] - a[1])) * (b[0] - a[0]));
+      }
+    }
+    xs.sort((p, q) => p - q);
+    const out = [];
+    for (let i = 0; i + 1 < xs.length; i += 2) if (xs[i + 1] - xs[i] > 0.05) out.push([xs[i], xs[i + 1]]);
+    return out;
+  }
+
+  function drawSection() {
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const W = secCv.clientWidth, H = secCv.clientHeight;
+    secCv.width = W * dpr; secCv.height = H * dpr;
+    const g = secCtx;
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    g.clearRect(0, 0, W, H);
+    const cs = getComputedStyle(document.body);
+    const ink = cs.getPropertyValue('--ink').trim();
+    const ink3 = cs.getPropertyValue('--ink3').trim();
+    const rule = cs.getPropertyValue('--rule').trim();
+    const accent = cs.getPropertyValue('--accent').trim();
+
+    const d = derived();
+    const modelW = P.capW + 17, modelH = d.totalH + 13;
+    const k = Math.min((W - 6) / modelW, (H - 6) / modelH);
+    const ox = W / 2, oy = H / 2 + (d.totalH * k) / 2 - 4;
+    const X = (mm) => ox + mm * k, Y = (mm) => oy - mm * k;
+    const rect = (p, x0, x1, z0, z1) => {
+      p.moveTo(X(x0), Y(z0)); p.lineTo(X(x1), Y(z0));
+      p.lineTo(X(x1), Y(z1)); p.lineTo(X(x0), Y(z1)); p.closePath();
+    };
+
+    // ---- material region, even-odd: outer − cavity + stem tube − slot (− recess)
+    const inW = d.inW, slotD = Math.min(P.stemSlotDepth, P.cavityH);
+    const solid = new Path2D();
+    solid.moveTo(X(-P.capW / 2), Y(0)); solid.lineTo(X(P.capW / 2), Y(0));
+    solid.lineTo(X(P.topW / 2), Y(P.capH)); solid.lineTo(X(-P.topW / 2), Y(P.capH)); solid.closePath();
+    rect(solid, -inW / 2, inW / 2, 0, P.cavityH);
+    rect(solid, -P.stemDia / 2, P.stemDia / 2, 0, P.cavityH);
+    rect(solid, -P.stemSpan / 2, P.stemSpan / 2, 0, slotD);
+    const spans = legendSpansAtY0();
+    if (P.logoMode !== 'raised' && logoRings)
+      for (const [x0, x1] of spans) rect(solid, x0, x1, P.capH - d.legDepth, P.capH);
+
+    // 45° section hatch inside the material
+    g.save();
+    g.clip(solid, 'evenodd');
+    g.strokeStyle = rule; g.lineWidth = 1;
+    const hatch = new Path2D();
+    for (let s = -H; s < W + H; s += 5) { hatch.moveTo(s, 0); hatch.lineTo(s + H, H); }
+    g.stroke(hatch);
+    g.restore();
+    g.strokeStyle = ink; g.lineWidth = 1.25;
+    g.stroke(solid);
+    // build-plate line
+    g.strokeStyle = ink3; g.lineWidth = 1;
+    g.beginPath(); g.moveTo(X(-P.capW / 2 - 3), Y(0)); g.lineTo(X(P.capW / 2 + 3), Y(0)); g.stroke();
+
+    // ---- legend
+    if (logoRings && spans.length) {
+      g.fillStyle = accent;
+      for (const [x0, x1] of spans) {
+        const z0 = P.logoMode === 'raised' ? P.capH : P.capH - d.legDepth;
+        const z1 = P.logoMode === 'raised' ? P.capH + P.logoDepth : P.capH;
+        g.fillRect(X(x0), Y(z1), (x1 - x0) * k, (z1 - z0) * k);
+      }
+    }
+
+    // ---- dimensions
+    g.font = '500 10px "IBM Plex Mono", monospace';
+    g.strokeStyle = ink3; g.fillStyle = ink3; g.lineWidth = 1;
+    const arrow = (x, y, dx, dy) => {
+      g.beginPath(); g.moveTo(x, y);
+      g.lineTo(x + dx * 4 - dy * 2.2, y + dy * 4 + dx * 2.2);
+      g.lineTo(x + dx * 4 + dy * 2.2, y + dy * 4 - dx * 2.2);
+      g.closePath(); g.fill();
+    };
+    const dimH = (mmA, mmB, z, label, off) => {
+      const y = Y(z) + off;
+      g.beginPath(); g.moveTo(X(mmA), y); g.lineTo(X(mmB), y); g.stroke();
+      arrow(X(mmA), y, 1, 0); arrow(X(mmB), y, -1, 0);
+      g.textAlign = 'center'; g.textBaseline = 'bottom';
+      g.fillText(label, (X(mmA) + X(mmB)) / 2, y - 2);
+    };
+    const dimV = (x, z0, z1, label, off) => {
+      const xx = X(x) + off;
+      g.beginPath(); g.moveTo(xx, Y(z0)); g.lineTo(xx, Y(z1)); g.stroke();
+      arrow(xx, Y(z0), 0, -1); arrow(xx, Y(z1), 0, 1);
+      g.save(); g.translate(xx - 3, (Y(z0) + Y(z1)) / 2); g.rotate(-Math.PI / 2);
+      g.textAlign = 'center'; g.textBaseline = 'bottom'; g.fillText(label, 0, 0); g.restore();
+    };
+    dimH(-P.capW / 2, P.capW / 2, 0, P.capW.toFixed(1), 15);
+    dimH(-P.stemSpan / 2, P.stemSpan / 2, slotD / 2, P.stemSpan.toFixed(2), 5);
+    dimV(P.capW / 2, 0, P.capH, P.capH.toFixed(1), 14);
+    dimV(-P.capW / 2, 0, P.cavityH, P.cavityH.toFixed(1), -14);
+    dimV(-P.capW / 2, P.cavityH, P.capH, d.roofT.toFixed(1), -14);
+  }
+
+  // ---------------------------------------------------- 3D preview (WebGL)
+  // A real depth buffer: the cap is an open cup with a stem inside it, and
+  // painter's-algorithm sorting shreds that (interior walls punch through the
+  // skirt, the legend fights the top face).  WebGL settles it per pixel.
+  const cv = $('view');
+  let az = 0.62, el = 0.44, zoom = 1, drag = null;
+  let gl = null, prog = null, vbo = null, gridVbo = null, nTri = 0, nGrid = 0, U = {}, A = {};
+
+  const VS = `
+    attribute vec3 aPos; attribute vec3 aNor; attribute vec3 aCol;
+    uniform vec3 uRight, uUp, uDir, uCenter;
+    uniform vec2 uS; uniform float uSz;
+    varying vec3 vNor; varying vec3 vCol;
+    void main(){
+      vec3 v = aPos - uCenter;
+      gl_Position = vec4(dot(uRight,v)*uS.x, dot(uUp,v)*uS.y, -dot(uDir,v)*uSz, 1.0);
+      vNor = aNor; vCol = aCol;
+    }`;
+  const FS = `
+    precision mediump float;
+    uniform vec3 uLight, uGround; uniform float uFlat;
+    varying vec3 vNor; varying vec3 vCol;
+    void main(){
+      vec3 n = normalize(vNor);
+      if (!gl_FrontFacing) n = -n;
+      float lam = max(dot(n, uLight), 0.0);
+      float t = uFlat > 0.5 ? 1.0 : 0.32 + 0.68 * lam;
+      gl_FragColor = vec4(mix(uGround, vCol, t), 1.0);
+    }`;
+
+  function initGL() {
+    gl = cv.getContext('webgl', { antialias: true, alpha: false, depth: true });
+    if (!gl) return false;
+    const sh = (type, src) => {
+      const o = gl.createShader(type);
+      gl.shaderSource(o, src); gl.compileShader(o);
+      if (!gl.getShaderParameter(o, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(o));
+      return o;
+    };
+    prog = gl.createProgram();
+    gl.attachShader(prog, sh(gl.VERTEX_SHADER, VS));
+    gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, FS));
+    gl.linkProgram(prog);
+    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog));
+    gl.useProgram(prog);
+    for (const n of ['aPos', 'aNor', 'aCol']) A[n] = gl.getAttribLocation(prog, n);
+    for (const n of ['uRight','uUp','uDir','uCenter','uS','uSz','uLight','uGround','uFlat'])
+      U[n] = gl.getUniformLocation(prog, n);
+    vbo = gl.createBuffer(); gridVbo = gl.createBuffer();
+    gl.enable(gl.DEPTH_TEST);
+    return true;
+  }
+  const glOK = (() => { try { return initGL(); } catch (e) { return false; } })();
+  if (!glOK) {
+    const w = document.createElement('p');
+    w.className = 'hint'; w.style.cssText = 'left:12px;top:12px;bottom:auto;max-width:60%';
+    w.textContent = 'Trình duyệt này không bật WebGL nên không có xem trước 3D — bản vẽ mặt cắt bên dưới vẫn đúng.';
+    document.querySelector('.viewwrap').appendChild(w);
+  }
+
+  const rgb = (s) => {
+    s = (s || '').trim();
+    if (s[0] === '#') {
+      const h = s.length === 4 ? s.slice(1).split('').map((c) => c + c).join('') : s.slice(1);
+      return [parseInt(h.slice(0,2),16)/255, parseInt(h.slice(2,4),16)/255, parseInt(h.slice(4,6),16)/255];
+    }
+    const m = s.match(/-?\d+\.?\d*/g);
+    return m ? [m[0]/255, m[1]/255, m[2]/255] : [0.5, 0.5, 0.5];
+  };
+  const cssVar = (n) => getComputedStyle(document.body).getPropertyValue(n);
+
+  /** Expand the meshes to flat-shaded triangles + a build-plate grid. */
+  function upload() {
+    if (!glOK || !built) return;
+    const capCol = rgb(P.capColor || cssVar('--cap-face'));
+    const logoCol = rgb(P.logoColor || cssVar('--logo-lit'));
+    const out = [];
+    for (const item of built.preview) {
+      const M = item.mesh, c = item.kind === 'logo' ? logoCol : capCol;
+      for (const f of M.F) {
+        const a = M.V[f[0]], b = M.V[f[1]], q = M.V[f[2]];
+        const u = [b[0]-a[0], b[1]-a[1], b[2]-a[2]], v = [q[0]-a[0], q[1]-a[1], q[2]-a[2]];
+        let n = [u[1]*v[2]-u[2]*v[1], u[2]*v[0]-u[0]*v[2], u[0]*v[1]-u[1]*v[0]];
+        const L = Math.hypot(n[0], n[1], n[2]) || 1;
+        n = [n[0]/L, n[1]/L, n[2]/L];
+        const zb = item.zBias || 0;
+        for (const p of [a, b, q]) out.push(p[0], p[1], p[2] + zb, n[0], n[1], n[2], c[0], c[1], c[2]);
+      }
+    }
+    nTri = out.length / 9;
+    gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(out), gl.DYNAMIC_DRAW);
+
+    const gcol = rgb(cssVar('--grid')), gg = [];
+    const G = Math.ceil(P.capW / 2 / 5) * 5 + 5;
+    for (let i = -G; i <= G; i += 5) {
+      gg.push(i, -G, 0, 0, 0, 1, gcol[0], gcol[1], gcol[2],  i, G, 0, 0, 0, 1, gcol[0], gcol[1], gcol[2]);
+      gg.push(-G, i, 0, 0, 0, 1, gcol[0], gcol[1], gcol[2],  G, i, 0, 0, 0, 1, gcol[0], gcol[1], gcol[2]);
+    }
+    nGrid = gg.length / 9;
+    gl.bindBuffer(gl.ARRAY_BUFFER, gridVbo);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(gg), gl.STATIC_DRAW);
+  }
+
+  function bindAttribs() {
+    const S = 9 * 4;
+    gl.vertexAttribPointer(A.aPos, 3, gl.FLOAT, false, S, 0);
+    gl.vertexAttribPointer(A.aNor, 3, gl.FLOAT, false, S, 12);
+    gl.vertexAttribPointer(A.aCol, 3, gl.FLOAT, false, S, 24);
+    gl.enableVertexAttribArray(A.aPos);
+    gl.enableVertexAttribArray(A.aNor);
+    gl.enableVertexAttribArray(A.aCol);
+  }
+
+  function render() {
+    if (!glOK || !built) return;
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const W = cv.clientWidth, H = cv.clientHeight;
+    if (!W || !H) return;
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+    gl.viewport(0, 0, cv.width, cv.height);
+    const ground = rgb(cssVar('--sunk'));
+    gl.clearColor(ground[0], ground[1], ground[2], 1);
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+    const d = derived();
+    const ca = Math.cos(az), sa = Math.sin(az), ce = Math.cos(el), se = Math.sin(el);
+    const dir = [ce*ca, ce*sa, se], right = [-sa, ca, 0], up = [-se*ca, -se*sa, ce];
+    const k = (Math.min(W, H) / (P.capW * 1.5)) * zoom;
+    const Lv = (() => { const v = [-0.42, -0.66, 0.62], n = Math.hypot(v[0],v[1],v[2]); return v.map((x)=>x/n); })();
+
+    gl.useProgram(prog);
+    gl.uniform3fv(U.uRight, right); gl.uniform3fv(U.uUp, up); gl.uniform3fv(U.uDir, dir);
+    gl.uniform3fv(U.uCenter, [0, 0, d.totalH / 2]);
+    gl.uniform2fv(U.uS, [2 * k / W, 2 * k / H]);
+    gl.uniform1f(U.uSz, 1 / 90);
+    gl.uniform3fv(U.uLight, Lv);
+    gl.uniform3fv(U.uGround, ground);
+
+    gl.uniform1f(U.uFlat, 1);
+    gl.bindBuffer(gl.ARRAY_BUFFER, gridVbo); bindAttribs();
+    gl.drawArrays(gl.LINES, 0, nGrid);
+
+    gl.uniform1f(U.uFlat, 0);
+    gl.bindBuffer(gl.ARRAY_BUFFER, vbo); bindAttribs();
+    gl.drawArrays(gl.TRIANGLES, 0, nTri);
+  }
+
+  cv.addEventListener('pointerdown', (e) => {
+    drag = { x: e.clientX, y: e.clientY, az, el };
+    cv.setPointerCapture(e.pointerId);
+  });
+  cv.addEventListener('pointermove', (e) => {
+    if (!drag) return;
+    az = drag.az + (e.clientX - drag.x) * 0.008;
+    el = clamp(drag.el + (e.clientY - drag.y) * 0.008, -1.45, 1.45);
+    render();
+  });
+  cv.addEventListener('pointerup', () => { drag = null; });
+  cv.addEventListener('pointercancel', () => { drag = null; });
+  cv.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    zoom = clamp(zoom * (e.deltaY > 0 ? 0.92 : 1.087), 0.4, 4);
+    render();
+  }, { passive: false });
+
+  new ResizeObserver(() => { render(); drawSection(); }).observe(document.querySelector('.stage'));
+
+  // ------------------------------------------------------------- download
+  let toastT = 0;
+  function toast(msg) {
+    const t = $('toast');
+    t.textContent = msg; t.classList.add('show');
+    clearTimeout(toastT);
+    toastT = setTimeout(() => t.classList.remove('show'), 3400);
+  }
+
+  async function offer(filename, bytes) {
+    if (!SANDBOXED) {
+      const blob = new Blob([bytes], { type: 'application/octet-stream' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob); a.download = filename;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+      toast('Đã tải ' + filename);
+      return;
+    }
+    const dl = await window.claude.use('downloads');
+    if (!dl) { toast('Bản này không tải file được — dùng bản HTML offline.'); return; }
+    try {
+      await dl.save({ filename, data: new Blob([bytes]) });
+      toast('Đã lưu ' + filename);
+    } catch (e) {
+      if (e && e.code === 'declined') return;
+      if (e && e.code === 'rejected_extension')
+        toast('Trang đã publish chỉ lưu được .json — mở bản HTML offline để xuất ' + filename.split('.').pop());
+      else toast('Không lưu được file: ' + (e && e.message ? e.message : 'lỗi không rõ'));
+    }
+  }
+
+  const deburr = (s) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd').replace(/Đ/g, 'D');
+  const slug = () => (deburr(logoSlug || 'keycap').replace(/\.[^.]+$/, '')
+    .replace(/[^a-z0-9._-]+/gi, '-').replace(/^-+|-+$/g, '').slice(0, 40)) || 'keycap';
+
+  $('dl3mf').onclick = () => {
+    const n = clamp(Math.round(P.count) || 1, 1, 40);
+    offer(`${slug()}-${P.capW.toFixed(1)}mm-x${n}.3mf`,
+      exportKeycap3mf({ ...P, name: slug() }, logoRings, n, P.plate));
+  };
+  $('dlstl').onclick = () =>
+    offer(`${slug()}-${P.capW.toFixed(1)}mm.stl`, exportKeycapStl({ ...P, name: slug() }, logoRings));
+  $('dljson').onclick = () => {
+    const cfg = { app: 'xuong-keycap-mx', v: 1, params: P, logo: logoName || null,
+                  logoRings: logoRings || null };
+    offer(`${slug()}-thongso.json`, new TextEncoder().encode(JSON.stringify(cfg, null, 1)));
+  };
+
+  if (SANDBOXED) {
+    $('dl3mf').disabled = true; $('dlstl').disabled = true;
+    $('dlNote').innerHTML = 'Trang đã publish chỉ được lưu các định dạng trong danh sách cho phép, <b>không có .3mf/.stl</b>. ' +
+      'Chỉnh xong ở đây rồi bấm <b>Lưu thông số .json</b>, mở file HTML offline và nạp lại — hoặc xuất trực tiếp trong bản offline.';
+    const load = document.createElement('label');
+    load.className = 'file'; load.style.marginTop = '8px';
+    load.innerHTML = '<b>Nạp thông số .json</b>đã lưu từ trước<input type="file" accept=".json">';
+    load.querySelector('input').addEventListener('change', (e) => loadCfg(e.target.files[0]));
+    $('dlNote').parentNode.insertBefore(load, $('dlNote'));
+  } else {
+    $('dlNote').innerHTML = 'File .3mf chứa 2 part gán sẵn extruder 1 (thân) và 2 (logo) — mở Bambu Studio là in 2 màu được ngay.';
+    const load = document.createElement('label');
+    load.className = 'file'; load.style.marginTop = '8px';
+    load.innerHTML = '<b>Nạp thông số .json</b>đã lưu từ trước<input type="file" accept=".json">';
+    load.querySelector('input').addEventListener('change', (e) => loadCfg(e.target.files[0]));
+    $('dlNote').parentNode.insertBefore(load, $('dlNote'));
+  }
+
+  async function loadCfg(file) {
+    if (!file) return;
+    try {
+      const cfg = JSON.parse(await file.text());
+      if (!cfg || !cfg.params) throw new Error('shape');
+      P = { ...P, ...cfg.params };
+      if (cfg.logoRings) { logoRings = cfg.logoRings; rawField = null; logoName = cfg.logo || 'logo'; logoSlug = logoName; $('fileName').textContent = logoName; }
+      clearPreset(); syncInputs(); rebuild();
+      toast('Đã nạp thông số');
+    } catch (e) { toast('File .json không đúng định dạng của công cụ này'); }
+  }
+
+  // ------------------------------------------------------------------ boot
+  $('fileName').textContent = logoName;
+  syncInputs();
+  rebuild();
+})();
+
+</script>
+</body>
+</html>

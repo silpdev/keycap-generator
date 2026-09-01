@@ -1,0 +1,31 @@
+{
+  "name": "keycap-generator",
+  "version": "1.0.0",
+  "description": "Parametric MX keycap generator in the browser — exports two-colour 3MF for Bambu Studio.",
+  "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/silpdev/keycap-generator.git"
+  },
+  "homepage": "https://silpdev.github.io/keycap-generator/",
+  "keywords": [
+    "keycap",
+    "mx",
+    "cherry-mx",
+    "3d-printing",
+    "3mf",
+    "bambu-studio",
+    "parametric",
+    "generator"
+  ],
+  "scripts": {
+    "dev": "vite",
+    "bundle": "node bundle.mjs",
+    "sample-logo": "node tools/make-sample-logo.mjs",
+    "test": "node test/test_tri.mjs && node test/test_vec.mjs && node test/test_export.mjs && node test/test_mesh.mjs"
+  },
+  "devDependencies": {
+    "vite": "^5.4.0"
+  }
+}

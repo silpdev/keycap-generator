@@ -1,0 +1,31 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # The geometry core and the tests use only Node builtins, so there is
+      # nothing to install.
+      - name: Geometry tests
+        run: npm test
+
+      - name: Rebuild the single-file page
+        run: npm run bundle
+
+      - name: docs/index.html must match src/
+        run: |
+          if ! git diff --quiet -- docs/index.html; then
+            echo "::error::docs/index.html is stale — run 'npm run bundle' and commit the result."
+            git diff --stat -- docs/index.html
+            exit 1
+          fi
