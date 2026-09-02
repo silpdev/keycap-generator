@@ -274,11 +274,18 @@ table.spec td.n{text-align:right;white-space:nowrap}
 
       <fieldset>
         <legend>Xuất file</legend>
-        <div class="colors">
-          <label><input id="capColor" type="color"> Màu thân</label>
-          <label><input id="logoColor" type="color"> Màu logo</label>
+        <div class="row wide" style="margin-bottom:8px">
+          <div class="seg" id="inkCount">
+            <button type="button" data-v="1">2 màu</button>
+            <button type="button" data-v="2">3 màu</button>
+            <button type="button" data-v="3">4 màu</button>
+          </div>
         </div>
-        <label class="check"><input id="embedFilaments" type="checkbox" checked> Khai báo sẵn 2 filament trong file</label>
+        <div class="colors" id="colorRow">
+          <label><input id="capColor" type="color"> Thân cap</label>
+        </div>
+        <p class="note" id="inkInfo" style="margin-top:6px"></p>
+        <label class="check"><input id="embedFilaments" type="checkbox" checked> Khai báo sẵn filament trong file</label>
         <div class="row wide" style="margin-bottom:9px;margin-top:9px">
           <div class="seg" id="flip">
             <button type="button" data-v="auto">Hướng tự động</button>
@@ -1246,22 +1253,49 @@ const PRESETS = {
   },
 };
 
-/** Fit the legend rings onto the cap top: scale to logoSize, then rotate/offset. */
-function placeLogo(rings, p) {
+/**
+ * The transform that fits a legend onto the cap top: scale to logoSize about the
+ * artwork's centre, then rotate and offset.  Split out from placeLogo so several
+ * ink groups can share ONE fit — computing it per group would scale and centre
+ * each colour separately and pull the logo apart.
+ */
+function logoFit(rings, p) {
   const b = ringsBounds(rings);
   const span = Math.max(b.w, b.h) || 1;
-  const scale = p.logoSize / span;
-  const cx = (b.x0 + b.x1) / 2, cy = (b.y0 + b.y1) / 2;
-  const centred = rings.map((r) => ({
-    outer: r.outer.map((q) => [q[0] - cx, q[1] - cy]),
-    holes: (r.holes || []).map((h) => h.map((q) => [q[0] - cx, q[1] - cy])),
-  }));
-  return transformRings(centred, {
-    scale, rot: p.logoRot || 0, dx: p.logoDx || 0, dy: p.logoDy || 0, mirror: !!p.mirror,
-  });
+  return {
+    scale: p.logoSize / span,
+    cx: (b.x0 + b.x1) / 2, cy: (b.y0 + b.y1) / 2,
+    rot: p.logoRot || 0, dx: p.logoDx || 0, dy: p.logoDy || 0, mirror: !!p.mirror,
+  };
 }
 
-/** Returns { parts, meshes, info } — parts feed the 3MF, meshes feed the preview. */
+function applyFit(rings, fit) {
+  const centred = rings.map((r) => ({
+    outer: r.outer.map((q) => [q[0] - fit.cx, q[1] - fit.cy]),
+    holes: (r.holes || []).map((h) => h.map((q) => [q[0] - fit.cx, q[1] - fit.cy])),
+  }));
+  return transformRings(centred, fit);
+}
+
+/** Fit one ring set onto the cap top. */
+function placeLogo(rings, p) {
+  return applyFit(rings, logoFit(rings, p));
+}
+
+/**
+ * The legend may be one set of rings (one ink, the old shape) or an array of
+ * ring sets, one per ink colour.  Normalising here means every caller — the
+ * exporters, the preview, the checks — sees the same thing.
+ */
+function inkGroups(logoRings) {
+  if (!logoRings || !logoRings.length) return [];
+  // a ring set is [{outer, holes}, ..]; a group list is [[{outer..}], [..]]
+  const nested = Array.isArray(logoRings[0]);
+  const groups = nested ? logoRings : [logoRings];
+  return groups.filter((g) => g && g.length);
+}
+
+/** Returns { parts, preview, info } — parts feed the 3MF, preview feeds the 3D view. */
 function buildKeycap(p, logoRings) {
   resetTriStats();
   const stemTop = Math.max(p.stemSlotDepth, p.cavityH) + 0.3;
@@ -1275,23 +1309,40 @@ function buildKeycap(p, logoRings) {
   const preview = [{ mesh: cap, kind: 'cap' }, { mesh: stem, kind: 'cap' }];
   const info = { stemTop, roofT: p.capH - p.cavityH };
 
-  if (logoRings && logoRings.length) {
-    const rings = placeLogo(logoRings, p);
+  const groups = inkGroups(logoRings);
+  if (groups.length) {
+    // Each ink is placed with the SAME transform, computed from all inks together,
+    // or the colours would be scaled and centred independently and come apart.
+    const all = groups.flat();
+    const fit = logoFit(all, p);
+    const placed = groups.map((g) => applyFit(g, fit));
+    let id = 3;
+    info.inks = groups.length;
+
     if (p.logoMode === 'raised') {
-      const prism = buildPrism(rings, p.capH - 0.01, p.capH + p.logoDepth).weld();
-      parts.push({ id: 3, name: 'Legend', mesh: prism, extruder: 2, subtype: 'normal_part' });
-      preview.push({ mesh: prism, kind: 'logo' });
+      placed.forEach((rings, i) => {
+        const prism = buildPrism(rings, p.capH - 0.01, p.capH + p.logoDepth).weld();
+        parts.push({ id: id++, name: groups.length > 1 ? `Legend ink ${i + 1}` : 'Legend',
+                     mesh: prism, extruder: 2 + i, subtype: 'normal_part' });
+        preview.push({ mesh: prism, kind: 'logo', ink: i });
+      });
     } else {
       const roofT = p.capH - p.cavityH;
       const d = p.logoMode === 'through' ? roofT : Math.min(p.logoDepth, roofT - 0.4);
       const z0 = p.capH - d;
-      const cut = buildPrism(rings, z0 - (p.logoMode === 'through' ? 0.4 : 0), p.capH + 0.3).weld();
-      const fill = buildPrism(rings, z0, p.capH).weld();
-      parts.push({ id: 3, name: 'Legend cutout', mesh: cut, subtype: 'negative_part' });
-      parts.push({ id: 4, name: 'Legend', mesh: fill, extruder: 2, subtype: 'normal_part' });
-      // flush with the cap's top face -> nudge the preview copy so the depth
-      // buffer has a winner (the exported geometry stays exact)
-      preview.push({ mesh: fill, kind: 'logo', zBias: 0.012 });
+      // one cutout for every ink together: the recess is the same pocket
+      // whatever colour goes in it, and one negative part is one boolean
+      const cut = buildPrism(all.map((r) => applyFit([r], fit)[0]),
+        z0 - (p.logoMode === 'through' ? 0.4 : 0), p.capH + 0.3).weld();
+      parts.push({ id: id++, name: 'Legend cutout', mesh: cut, subtype: 'negative_part' });
+      placed.forEach((rings, i) => {
+        const fill = buildPrism(rings, z0, p.capH).weld();
+        parts.push({ id: id++, name: groups.length > 1 ? `Legend ink ${i + 1}` : 'Legend',
+                     mesh: fill, extruder: 2 + i, subtype: 'normal_part' });
+        // flush with the cap's top face -> nudge the preview copy so the depth
+        // buffer has a winner (the exported geometry stays exact)
+        preview.push({ mesh: fill, kind: 'logo', ink: i, zBias: 0.012 });
+      });
       info.legendDepth = d;
     }
   }
@@ -1335,13 +1386,17 @@ function layout(count, capW, capD, plate = 256) {
 
 function exportKeycap3mf(p, logoRings, count = 1, plate = 256) {
   const { parts } = orientForPrint(buildKeycap(p, logoRings).parts, p.logoMode, p.flip);
-  const twoColour = parts.some((x) => x.extruder === 2);
+  // one filament slot per extruder actually used, in order
+  const top = parts.reduce((m, x) => Math.max(m, x.extruder || 1), 1);
+  const inks = p.inkColors && p.inkColors.length
+    ? p.inkColors : [p.logoColor || '#FFFFFF'];
+  const filaments = [p.capColor || '#F5820B'];
+  for (let i = 0; i + 1 < top; i++) filaments.push(inks[i] || inks[inks.length - 1] || '#FFFFFF');
   return build3mf({
     parts,
     copies: layout(count, p.capW, p.capD, plate),
     title: p.name || 'Keycap',
-    filaments: p.embedFilaments !== false && twoColour
-      ? [p.capColor || '#F5820B', p.logoColor || '#FFFFFF'] : null,
+    filaments: p.embedFilaments !== false && top > 1 ? filaments : null,
   });
 }
 
@@ -1931,6 +1986,157 @@ function legendPrintability(rings, { line = 0.42, logoSize = 0 } = {}) {
   return { ...s, line, need, lost: lost.length, risky: risky.length, sizeFor };
 }
 
+/* ---- src/palette.mjs ---- */
+// ---------------------------------------------------------------------------
+// Splitting a logo into ink colours.
+//
+// A brand mark already carries its own colours — the VNG wordmark is one navy
+// and one red — so asking the user which regions are which colour would be
+// asking them to re-enter information the file already has.  Cluster the
+// artwork's colours instead, and vectorise each cluster separately.
+//
+// Two things make this behave:
+//
+// Determinism.  k-means seeded at random gives a different answer every time
+// you drop the same file in, which is intolerable in a tool whose output you
+// print.  So the seeds come from the most populated buckets of a coarse colour
+// histogram, chosen farthest-first — no randomness anywhere.
+//
+// Soft edges.  A hard per-pixel label puts the boundary between two inks on a
+// pixel edge, and marching squares then traces a staircase.  Each cluster gets
+// an inverse-distance membership instead, so a pixel exactly between navy and
+// red counts 0.5 towards each and the iso-0.5 contour lands on the true colour
+// boundary with sub-pixel accuracy — the same way alpha gives smooth outer
+// edges.
+// ---------------------------------------------------------------------------
+
+const BITS = 4, LEV = 1 << BITS, SHIFT = 8 - BITS;   // 16³ histogram
+
+/** Populated colour buckets of the opaque pixels, as [{rgb, n}] . */
+function histogram(data, alphaMin) {
+  const bins = new Map();
+  for (let i = 0; i < data.length; i += 4) {
+    if (data[i + 3] < alphaMin) continue;
+    const r = data[i] >> SHIFT, g = data[i + 1] >> SHIFT, b = data[i + 2] >> SHIFT;
+    const k = (r * LEV + g) * LEV + b;
+    const e = bins.get(k);
+    if (e) { e.n++; e.r += data[i]; e.g += data[i + 1]; e.b += data[i + 2]; }
+    else bins.set(k, { n: 1, r: data[i], g: data[i + 1], b: data[i + 2] });
+  }
+  const out = [];
+  for (const e of bins.values())
+    out.push({ rgb: [e.r / e.n, e.g / e.n, e.b / e.n], n: e.n });
+  out.sort((a, b) => b.n - a.n);
+  return out;
+}
+
+const d2 = (a, b) => (a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2;
+
+/**
+ * Cluster the artwork into `k` ink colours.
+ *   data     — RGBA bytes (Uint8ClampedArray from getImageData)
+ *   k        — how many inks
+ *   alphaMin — below this the pixel is background
+ * Returns { inks:[{rgb, hex, share}], k } ordered by coverage, largest first.
+ */
+function inkColours(data, k = 2, { alphaMin = 128 } = {}) {
+  const hist = histogram(data, alphaMin);
+  if (!hist.length) return { inks: [], k: 0 };
+  k = Math.max(1, Math.min(k, hist.length));
+
+  // seed farthest-first among the populated buckets, starting from the biggest
+  const seeds = [hist[0].rgb];
+  while (seeds.length < k) {
+    let best = null, bestD = -1;
+    for (const h of hist) {
+      let near = Infinity;
+      for (const s of seeds) near = Math.min(near, d2(h.rgb, s));
+      // weight by population so a big block of colour beats a stray pixel
+      const score = near * Math.log2(1 + h.n);
+      if (score > bestD) { bestD = score; best = h.rgb; }
+    }
+    if (!best) break;
+    seeds.push(best);
+  }
+
+  // Lloyd over the histogram (weighted) — a few dozen buckets, converges fast
+  let cen = seeds.map((s) => s.slice());
+  for (let it = 0; it < 24; it++) {
+    const acc = cen.map(() => [0, 0, 0, 0]);
+    for (const h of hist) {
+      let bi = 0, bd = Infinity;
+      for (let i = 0; i < cen.length; i++) {
+        const d = d2(h.rgb, cen[i]);
+        if (d < bd) { bd = d; bi = i; }
+      }
+      const a = acc[bi];
+      a[0] += h.rgb[0] * h.n; a[1] += h.rgb[1] * h.n; a[2] += h.rgb[2] * h.n; a[3] += h.n;
+    }
+    let moved = 0;
+    const next = cen.map((c, i) => {
+      const a = acc[i];
+      if (!a[3]) return c;
+      const p = [a[0] / a[3], a[1] / a[3], a[2] / a[3]];
+      moved += d2(p, c);
+      return p;
+    });
+    cen = next;
+    if (moved < 1e-4) break;
+  }
+
+  // final coverage per centre, so they can be ordered by how much ink they are
+  const share = cen.map(() => 0);
+  let total = 0;
+  for (const h of hist) {
+    let bi = 0, bd = Infinity;
+    for (let i = 0; i < cen.length; i++) {
+      const d = d2(h.rgb, cen[i]);
+      if (d < bd) { bd = d; bi = i; }
+    }
+    share[bi] += h.n; total += h.n;
+  }
+  const hex = (c) => '#' + c.map((v) =>
+    Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0')).join('');
+  // Drop clusters that are only antialiasing.  Asking for 3 inks on a two-colour
+  // logo otherwise yields a third "colour" made of the blended pixels along the
+  // boundary — a part with 0.0% coverage, a wasted filament slot and a tool
+  // change per layer for nothing.  Better to report that only 2 were found.
+  const MIN_SHARE = 0.01;
+  const inks = cen.map((rgb, i) => ({ rgb, hex: hex(rgb), share: total ? share[i] / total : 0 }))
+    .filter((x) => x.share >= MIN_SHARE)
+    .sort((a, b) => b.share - a.share);
+  return { inks, k: inks.length, asked: k, dropped: cen.length - inks.length };
+}
+
+/**
+ * One coverage field per ink, ready for rasterToRings.
+ *
+ * Membership is inverse-distance so the contour between two inks lands where
+ * the colours actually meet, not on a pixel edge; multiplied by alpha so the
+ * outer edge keeps the sub-pixel softness the single-colour path already had.
+ */
+function inkFields(data, w, h, inks) {
+  const n = inks.length;
+  const out = Array.from({ length: n }, () => new Float32Array(w * h));
+  if (!n) return out;
+  const inv = new Float64Array(n);
+  for (let p = 0, i = 0; i < data.length; i += 4, p++) {
+    const a = data[i + 3] / 255;
+    if (a <= 0) continue;
+    const c = [data[i], data[i + 1], data[i + 2]];
+    let sum = 0, exact = -1;
+    for (let j = 0; j < n; j++) {
+      const d = d2(c, inks[j].rgb);
+      if (d < 1) { exact = j; break; }          // sitting on a centre
+      inv[j] = 1 / d;
+      sum += inv[j];
+    }
+    if (exact >= 0) { out[exact][p] = a; continue; }
+    for (let j = 0; j < n; j++) out[j][p] = a * (inv[j] / sum);
+  }
+  return out;
+}
+
 const DEFAULT_LOGO=[{"outer":[[5.8,-10],[6.27,-9.974],[6.735,-9.895],[7.187,-9.764],[7.622,-9.584],[8.035,-9.356],[8.419,-9.084],[8.77,-8.77],[9.084,-8.419],[9.356,-8.035],[9.584,-7.622],[9.764,-7.187],[9.895,-6.735],[9.974,-6.27],[10,-5.8],[10,5.8],[9.974,6.27],[9.895,6.735],[9.764,7.187],[9.584,7.622],[9.356,8.035],[9.084,8.419],[8.77,8.77],[8.419,9.084],[8.035,9.356],[7.622,9.584],[7.187,9.764],[6.735,9.895],[6.27,9.974],[5.8,10],[-5.8,10],[-6.27,9.974],[-6.735,9.895],[-7.187,9.764],[-7.622,9.584],[-8.035,9.356],[-8.419,9.084],[-8.77,8.77],[-9.084,8.419],[-9.356,8.035],[-9.584,7.622],[-9.764,7.187],[-9.895,6.735],[-9.974,6.27],[-10,5.8],[-10,-5.8],[-9.974,-6.27],[-9.895,-6.735],[-9.764,-7.187],[-9.584,-7.622],[-9.356,-8.035],[-9.084,-8.419],[-8.77,-8.77],[-8.419,-9.084],[-8.035,-9.356],[-7.622,-9.584],[-7.187,-9.764],[-6.735,-9.895],[-6.27,-9.974],[-5.8,-10]],"holes":[[[-4.4,-7.2],[-4.765,-7.176],[-5.125,-7.105],[-5.472,-6.987],[-5.8,-6.825],[-6.105,-6.621],[-6.38,-6.38],[-6.621,-6.105],[-6.825,-5.8],[-6.987,-5.472],[-7.105,-5.125],[-7.176,-4.765],[-7.2,-4.4],[-7.2,4.4],[-7.176,4.765],[-7.105,5.125],[-6.987,5.472],[-6.825,5.8],[-6.621,6.105],[-6.38,6.38],[-6.105,6.621],[-5.8,6.825],[-5.472,6.987],[-5.125,7.105],[-4.765,7.176],[-4.4,7.2],[4.4,7.2],[4.765,7.176],[5.125,7.105],[5.472,6.987],[5.8,6.825],[6.105,6.621],[6.38,6.38],[6.621,6.105],[6.825,5.8],[6.987,5.472],[7.105,5.125],[7.176,4.765],[7.2,4.4],[7.2,-4.4],[7.176,-4.765],[7.105,-5.125],[6.987,-5.472],[6.825,-5.8],[6.621,-6.105],[6.38,-6.38],[6.105,-6.621],[5.8,-6.825],[5.472,-6.987],[5.125,-7.105],[4.765,-7.176],[4.4,-7.2]]]},{"outer":[[4.8,-1.55],[4.8,1.55],[1.55,1.55],[1.55,4.8],[-1.55,4.8],[-1.55,1.55],[-4.8,1.55],[-4.8,-1.55],[-1.55,-1.55],[-1.55,-4.8],[1.55,-4.8],[1.55,-1.55]],"holes":[]}];
 
 // ===========================================================================
@@ -1951,8 +2157,12 @@ const DEFAULT_LOGO=[{"outer":[[5.8,-10],[6.27,-9.974],[6.735,-9.895],[7.187,-9.7
     'logoSize','logoDepth','logoRot','logoDx','logoDy','count','plate'];
 
   let P = { ...PRESETS[Object.keys(PRESETS)[0]], logoRot: 0, logoDx: 0, logoDy: 0, mirror: false,
-            count: 1, plate: 256, flip: 'auto', embedFilaments: true, name: 'Keycap' };
+            count: 1, plate: 256, flip: 'auto', embedFilaments: true, name: 'Keycap',
+            inkCount: 1, inkColors: ['#F2F4EC'] };
+  // One ring set per ink colour.  A single-ink logo is one group, so everything
+  // downstream sees the same shape whether you asked for 2 colours or 4.
   let logoRings = DEFAULT_LOGO;      // rings in arbitrary units; placeLogo rescales
+  let inkNote = '';
   let rawField = null;               // {f, w, h} coverage raster of an uploaded file
   let logoName = 'Hình mẫu có sẵn';
   let logoSlug = 'keycap';
@@ -1986,8 +2196,10 @@ const DEFAULT_LOGO=[{"outer":[[5.8,-10],[6.27,-9.974],[6.735,-9.895],[7.187,-9.7
     [...$('flip').children].forEach((b) =>
       b.setAttribute('aria-pressed', b.dataset.v === P.flip));
     $('capColor').value = P.capColor || '#7E8A7C';
-    $('logoColor').value = P.logoColor || '#F2F4EC';
     $('embedFilaments').checked = P.embedFilaments !== false;
+    [...$('inkCount').children].forEach((b) =>
+      b.setAttribute('aria-pressed', +b.dataset.v === (P.inkCount || 1)));
+    drawSwatches();
     $('logoDepth').previousElementSibling.textContent =
       P.logoMode === 'raised' ? 'Cao logo' : P.logoMode === 'through' ? 'Sâu (tự động)' : 'Sâu khắc';
     $('logoDepth').disabled = P.logoMode === 'through';
@@ -2007,8 +2219,43 @@ const DEFAULT_LOGO=[{"outer":[[5.8,-10],[6.27,-9.974],[6.735,-9.895],[7.187,-9.7
     });
   }
   $('mirror').addEventListener('change', () => { P.mirror = $('mirror').checked; rebuild(); });
-  for (const k of ['capColor', 'logoColor'])
-    $(k).addEventListener('input', () => { P[k] = $(k).value; upload(); render(); });
+  $('capColor').addEventListener('input', () => { P.capColor = $('capColor').value; upload(); render(); });
+  [...$('inkCount').children].forEach((b) => {
+    b.onclick = () => {
+      P.inkCount = +b.dataset.v;
+      syncInputs();
+      revectorize();                 // the ink count changes how the artwork is read
+      rebuild();
+    };
+  });
+
+  /**
+   * One picker per filament slot.  They are rebuilt rather than pre-declared
+   * because the count is a user choice, and their values are filled from the
+   * colours found in the artwork — a brand mark already knows what colour it is.
+   */
+  function drawSwatches() {
+    const row = $('colorRow');
+    [...row.querySelectorAll('.ink')].forEach((n) => n.remove());
+    const n = groupCount();
+    for (let i = 0; i < n; i++) {
+      const lab = document.createElement('label');
+      lab.className = 'ink';
+      const inp = document.createElement('input');
+      inp.type = 'color';
+      inp.value = P.inkColors[i] || '#F2F4EC';
+      inp.addEventListener('input', () => {
+        P.inkColors = P.inkColors.slice();
+        P.inkColors[i] = inp.value;
+        upload(); render();
+      });
+      lab.appendChild(inp);
+      lab.appendChild(document.createTextNode(n > 1 ? ` Mực ${i + 1}` : ' Màu logo'));
+      row.appendChild(lab);
+    }
+    $('inkInfo').textContent = inkNote;
+  }
+  const groupCount = () => Math.max(1, inkGroups(logoRings).length);
   $('embedFilaments').addEventListener('change', () => { P.embedFilaments = $('embedFilaments').checked; });
   [...$('logoMode').children].forEach((b) => {
     b.onclick = () => { P.logoMode = b.dataset.v; syncInputs(); rebuild(); };
@@ -2026,7 +2273,7 @@ const DEFAULT_LOGO=[{"outer":[[5.8,-10],[6.27,-9.974],[6.735,-9.895],[7.187,-9.7
   // ---------------------------------------------------------- logo input
   $('logoFile').addEventListener('change', (e) => { if (e.target.files[0]) takeFile(e.target.files[0]); });
   $('clearLogo').onclick = () => {
-    rawField = null; logoRings = null; logoName = ''; logoSlug = 'keycap'; logoInfo = '';
+    rawField = null; logoRings = null; logoName = ''; logoSlug = 'keycap'; logoInfo = ''; inkNote = '';
     $('legendText').value = ''; $('logoFile').value = ''; textJob++;
     $('fileName').textContent = 'Chọn file SVG hoặc PNG';
     $('logoInfo').textContent = '';
@@ -2106,7 +2353,10 @@ const DEFAULT_LOGO=[{"outer":[[5.8,-10],[6.27,-9.974],[6.735,-9.895],[7.187,-9.7
       if (hasAlpha) f[p] = d[i + 3] / 255;
       else f[p] = 1 - (0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]) / 255;
     }
-    return { f, w: c.width, h: c.height, srcNote, small: !isSvg && Math.max(nw, nh) < 256 };
+    // keep the pixels too: splitting the logo by ink colour needs the actual
+    // colours, and re-reading the file on every change would be wasteful
+    return { f, rgba: d, w: c.width, h: c.height, srcNote,
+             small: !isSvg && Math.max(nw, nh) < 256 };
   }
 
   /**
@@ -2192,7 +2442,7 @@ const DEFAULT_LOGO=[{"outer":[[5.8,-10],[6.27,-9.974],[6.735,-9.895],[7.187,-9.7
       textJob++;
       $('fileName').textContent = file.name;
       revectorize();
-      if (!logoRings || !logoRings.length) toast('Không tách được hình — thử kéo thanh “ngưỡng tách hình”');
+      if (!inkGroups(logoRings).length) toast('Không tách được hình — thử kéo thanh “ngưỡng tách hình”');
       else if (rawField.small) toast('Ảnh nguồn nhỏ hơn 256 px nên chi tiết mảnh sẽ bị nhoè — dùng SVG hoặc ảnh lớn hơn');
       rebuild();
     } catch (err) {
@@ -2201,15 +2451,42 @@ const DEFAULT_LOGO=[{"outer":[[5.8,-10],[6.27,-9.974],[6.735,-9.895],[7.187,-9.7
   }
 
   function revectorize() {
-    if (!rawField) { logoInfo = ''; return; }
+    if (!rawField) { logoInfo = ''; inkNote = ''; return; }
     const iso = parseFloat($('thr').value);
-    logoRings = rasterToRings(rawField.f, rawField.w, rawField.h,
+    const trace = (field) => rasterToRings(field, rawField.w, rawField.h,
       { pxPerMM: 1, tolPx: 0.35, minArea: 24, iso });
-    const holes = logoRings.reduce((s, r) => s + r.holes.length, 0);
-    const pts = logoRings.reduce((s, r) => s + r.outer.length +
+
+    const want = Math.max(1, Math.min(3, P.inkCount || 1));
+    inkNote = '';
+    if (want > 1 && rawField.rgba) {
+      const { inks, dropped } = inkColours(rawField.rgba, want);
+      if (inks.length > 1) {
+        const fields = inkFields(rawField.rgba, rawField.w, rawField.h, inks);
+        logoRings = fields.map(trace).filter((g) => g.length);
+        // The artwork's own colours are the best default for the filament slots.
+        P.inkColors = inks.slice(0, logoRings.length).map((x) => x.hex);
+        inkNote = `Tách được ${inks.length} màu mực từ ảnh: ` +
+          inks.map((x) => `${x.hex} ${(x.share * 100).toFixed(0)}%`).join(' · ') +
+          (dropped ? ` (bỏ ${dropped} nhóm chỉ là viền chống răng cưa)` : '');
+      } else {
+        logoRings = [trace(rawField.f)];
+        inkNote = 'Ảnh này chỉ có một màu mực — chọn "2 màu" thôi là đủ.';
+      }
+    } else {
+      logoRings = [trace(rawField.f)];
+      if (want > 1) inkNote = 'Legend bằng chữ chỉ có một màu — muốn nhiều màu thì dùng ảnh có sẵn nhiều màu.';
+    }
+
+    const groups = inkGroups(logoRings);
+    const all = groups.flat();
+    const holes = all.reduce((s, r) => s + r.holes.length, 0);
+    const pts = all.reduce((s, r) => s + r.outer.length +
       r.holes.reduce((a, h) => a + h.length, 0), 0);
-    logoInfo = `${rawField.srcNote} · ${logoRings.length} vùng, ${holes} lỗ, ${pts} điểm`;
+    logoInfo = `${rawField.srcNote} · ` +
+      (groups.length > 1 ? `${groups.length} màu mực · ` : '') +
+      `${all.length} vùng, ${holes} lỗ, ${pts} điểm`;
     $('logoInfo').textContent = logoInfo;
+    drawSwatches();
   }
 
   // ------------------------------------------------------------- rebuild
@@ -2237,7 +2514,7 @@ const DEFAULT_LOGO=[{"outer":[[5.8,-10],[6.27,-9.974],[6.735,-9.895],[7.187,-9.7
     const armClr = P.stemArm - MX_POST_ARM;
     const legDepth = P.logoMode === 'through' ? roofT
       : P.logoMode === 'recessed' ? Math.min(P.logoDepth, roofT - 0.4) : P.logoDepth;
-    const totalH = P.capH + (P.logoMode === 'raised' && logoRings ? P.logoDepth : 0);
+    const totalH = P.capH + (P.logoMode === 'raised' && inkGroups(logoRings).length ? P.logoDepth : 0);
     const faceDown = P.flip === 'down' || (P.flip === 'auto' && P.logoMode !== 'raised');
     return { inW, inD, roofT, stemWall, clr, armClr, legDepth, totalH, faceDown, cavTop,
              stemTop: Math.max(P.stemSlotDepth, P.cavityH) + 0.3 };
@@ -2249,14 +2526,26 @@ const DEFAULT_LOGO=[{"outer":[[5.8,-10],[6.27,-9.974],[6.735,-9.895],[7.187,-9.7
   // placed, so cache on exactly that.
   let strokeKey = '', strokeVal = null;
   function strokeInfo() {
-    if (!logoRings || !logoRings.length) return null;
+    const groups = inkGroups(logoRings);
+    if (!groups.length) return null;
     const line = parseFloat($('lineWidth').value) || 0.42;
-    const key = [logoName, logoRings.length, P.logoSize, P.logoRot, P.logoDx, P.logoDy,
-                 P.mirror ? 1 : 0, line].join('|');
+    const key = [logoName, groups.length, groups.map((g) => g.length).join(','),
+                 P.logoSize, P.logoRot, P.logoDx, P.logoDy, P.mirror ? 1 : 0, line].join('|');
     if (key !== strokeKey) {
       strokeKey = key;
-      try { strokeVal = legendPrintability(placeLogo(logoRings, P), { line, logoSize: P.logoSize }); }
-      catch (e) { strokeVal = null; }
+      try {
+        // Every ink shares one fit, and every ink has to survive on its own — a
+        // colour whose strokes are too thin is lost whatever the others do.
+        const fit = logoFit(groups.flat(), P);
+        const each = groups.map((g) =>
+          legendPrintability(applyFit(g, fit), { line, logoSize: P.logoSize }));
+        const worst = each.reduce((a, b) => (b && (!a || b.min < a.min) ? b : a), null);
+        strokeVal = worst && { ...worst,
+          lost: each.reduce((n, v) => n + (v ? v.lost : 0), 0),
+          risky: each.reduce((n, v) => n + (v ? v.risky : 0), 0),
+          inks: each.length,
+          worstInk: each.indexOf(worst) + 1 };
+      } catch (e) { strokeVal = null; }
     }
     return strokeVal;
   }
@@ -2292,7 +2581,7 @@ const DEFAULT_LOGO=[{"outer":[[5.8,-10],[6.27,-9.974],[6.735,-9.895],[7.187,-9.7
       d.roofT < 1.2 ? 'Mái cap mỏng hơn 1.2 mm — bấm nhiều sẽ lún.'
       : (P.logoMode !== 'raised' && d.legDepth < 0.3) ? 'Mái cap quá mỏng để khắc logo sâu như vậy. Giảm “sâu khắc” hoặc giảm “sâu hốc switch”.' : null);
 
-    if (logoRings) {
+    if (inkGroups(logoRings).length) {
       const room = Math.min(P.topW, P.topD);
       add('Logo trên mặt trên', `${P.logoSize.toFixed(1)} / ${room.toFixed(1)} mm`,
         P.logoSize <= room - 0.8,
@@ -2309,7 +2598,8 @@ const DEFAULT_LOGO=[{"outer":[[5.8,-10],[6.27,-9.974],[6.735,-9.895],[7.187,-9.7
         add('Nét mảnh nhất', `${pr.min.toFixed(2)} / ${pr.need.toFixed(2)} mm`,
           pr.min >= pr.need,
           pr.lost
-            ? `${pr.lost} vùng của logo có nét mảnh nhất ${pr.min.toFixed(2)} mm — chưa tới một đường đùn ` +
+            ? `${pr.lost} vùng của logo` + (pr.inks > 1 ? ` (mảnh nhất ở mực ${pr.worstInk})` : '') +
+              ` có nét mảnh nhất ${pr.min.toFixed(2)} mm — chưa tới một đường đùn ` +
               `${pr.line.toFixed(2)} mm, nên máy KHÔNG in được chúng bằng filament 2: mấy vùng đó sẽ ra ` +
               `màu thân cap, chỉ còn nổi mờ mờ (mất chữ). Cần logo rộng ${pr.sizeFor.toFixed(1)} mm mới đủ nét` +
               (fits ? '.' : `, mà mặt trên chỉ chứa được ${(room - 0.8).toFixed(1)} mm — ` +
@@ -2355,8 +2645,9 @@ const DEFAULT_LOGO=[{"outer":[[5.8,-10],[6.27,-9.974],[6.735,-9.895],[7.187,-9.7
 
   /** x-intervals where the placed legend rings cross the section plane y=0. */
   function legendSpansAtY0() {
-    if (!logoRings) return [];
-    const rings = placeLogo(logoRings, P);
+    const groups = inkGroups(logoRings);
+    if (!groups.length) return [];
+    const rings = applyFit(groups.flat(), logoFit(groups.flat(), P));
     const xs = [];
     for (const r of rings) for (const ring of [r.outer, ...(r.holes || [])]) {
       for (let i = 0; i < ring.length; i++) {
@@ -2402,7 +2693,7 @@ const DEFAULT_LOGO=[{"outer":[[5.8,-10],[6.27,-9.974],[6.735,-9.895],[7.187,-9.7
     rect(solid, -P.stemDia / 2, P.stemDia / 2, 0, P.cavityH);
     rect(solid, -P.stemSpan / 2, P.stemSpan / 2, 0, slotD);
     const spans = legendSpansAtY0();
-    if (P.logoMode !== 'raised' && logoRings)
+    if (P.logoMode !== 'raised' && inkGroups(logoRings).length)
       for (const [x0, x1] of spans) rect(solid, x0, x1, P.capH - d.legDepth, P.capH);
 
     // 45° section hatch inside the material
@@ -2420,7 +2711,7 @@ const DEFAULT_LOGO=[{"outer":[[5.8,-10],[6.27,-9.974],[6.735,-9.895],[7.187,-9.7
     g.beginPath(); g.moveTo(X(-P.capW / 2 - 3), Y(0)); g.lineTo(X(P.capW / 2 + 3), Y(0)); g.stroke();
 
     // ---- legend
-    if (logoRings && spans.length) {
+    if (inkGroups(logoRings).length && spans.length) {
       g.fillStyle = accent;
       for (const [x0, x1] of spans) {
         const z0 = P.logoMode === 'raised' ? P.capH : P.capH - d.legDepth;
@@ -2542,10 +2833,13 @@ const DEFAULT_LOGO=[{"outer":[[5.8,-10],[6.27,-9.974],[6.735,-9.895],[7.187,-9.7
   function upload() {
     if (!glOK || !built) return;
     const capCol = rgb(P.capColor || cssVar('--cap-face'));
-    const logoCol = rgb(P.logoColor || cssVar('--logo-lit'));
+    const inkCols = (P.inkColors && P.inkColors.length ? P.inkColors : [cssVar('--logo-lit')])
+      .map((c) => rgb(c));
     const out = [];
     for (const item of built.preview) {
-      const M = item.mesh, c = item.kind === 'logo' ? logoCol : capCol;
+      const M = item.mesh;
+      const c = item.kind === 'logo'
+        ? (inkCols[item.ink || 0] || inkCols[inkCols.length - 1]) : capCol;
       for (const f of M.F) {
         const a = M.V[f[0]], b = M.V[f[1]], q = M.V[f[2]];
         const u = [b[0]-a[0], b[1]-a[1], b[2]-a[2]], v = [q[0]-a[0], q[1]-a[1], q[2]-a[2]];
@@ -2685,7 +2979,7 @@ const DEFAULT_LOGO=[{"outer":[[5.8,-10],[6.27,-9.974],[6.735,-9.895],[7.187,-9.7
   // recessed or through legend simply is not in the file: what comes out is a
   // blank cap.  Say so instead of letting it look like an export that worked.
   $('dlstl').onclick = () => {
-    const lost = logoRings && P.logoMode !== 'raised'
+    const lost = inkGroups(logoRings).length && P.logoMode !== 'raised'
       ? (P.logoMode === 'through'
           ? '.stl không mang được phần khoét nên logo xuyên sáng mất hẳn, cap ra đặc. Dùng .3mf.'
           : '.stl không mang được phần khoét nên logo khắc lõm mất, cap ra trơn. Dùng .3mf.')
@@ -2769,7 +3063,7 @@ const DEFAULT_LOGO=[{"outer":[[5.8,-10],[6.27,-9.974],[6.735,-9.895],[7.187,-9.7
   };
 
   $('dljson').onclick = () => {
-    const cfg = { app: 'xuong-keycap-mx', v: 1, params: P, logo: logoName || null,
+    const cfg = { app: 'xuong-keycap-mx', v: 2, params: P, logo: logoName || null,
                   logoRings: logoRings || null };
     offer(`${slug()}-thongso.json`, new TextEncoder().encode(JSON.stringify(cfg, null, 1)));
   };

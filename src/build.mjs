@@ -32,22 +32,49 @@ export const PRESETS = {
   },
 };
 
-/** Fit the legend rings onto the cap top: scale to logoSize, then rotate/offset. */
-export function placeLogo(rings, p) {
+/**
+ * The transform that fits a legend onto the cap top: scale to logoSize about the
+ * artwork's centre, then rotate and offset.  Split out from placeLogo so several
+ * ink groups can share ONE fit — computing it per group would scale and centre
+ * each colour separately and pull the logo apart.
+ */
+export function logoFit(rings, p) {
   const b = ringsBounds(rings);
   const span = Math.max(b.w, b.h) || 1;
-  const scale = p.logoSize / span;
-  const cx = (b.x0 + b.x1) / 2, cy = (b.y0 + b.y1) / 2;
-  const centred = rings.map((r) => ({
-    outer: r.outer.map((q) => [q[0] - cx, q[1] - cy]),
-    holes: (r.holes || []).map((h) => h.map((q) => [q[0] - cx, q[1] - cy])),
-  }));
-  return transformRings(centred, {
-    scale, rot: p.logoRot || 0, dx: p.logoDx || 0, dy: p.logoDy || 0, mirror: !!p.mirror,
-  });
+  return {
+    scale: p.logoSize / span,
+    cx: (b.x0 + b.x1) / 2, cy: (b.y0 + b.y1) / 2,
+    rot: p.logoRot || 0, dx: p.logoDx || 0, dy: p.logoDy || 0, mirror: !!p.mirror,
+  };
 }
 
-/** Returns { parts, meshes, info } — parts feed the 3MF, meshes feed the preview. */
+export function applyFit(rings, fit) {
+  const centred = rings.map((r) => ({
+    outer: r.outer.map((q) => [q[0] - fit.cx, q[1] - fit.cy]),
+    holes: (r.holes || []).map((h) => h.map((q) => [q[0] - fit.cx, q[1] - fit.cy])),
+  }));
+  return transformRings(centred, fit);
+}
+
+/** Fit one ring set onto the cap top. */
+export function placeLogo(rings, p) {
+  return applyFit(rings, logoFit(rings, p));
+}
+
+/**
+ * The legend may be one set of rings (one ink, the old shape) or an array of
+ * ring sets, one per ink colour.  Normalising here means every caller — the
+ * exporters, the preview, the checks — sees the same thing.
+ */
+export function inkGroups(logoRings) {
+  if (!logoRings || !logoRings.length) return [];
+  // a ring set is [{outer, holes}, ..]; a group list is [[{outer..}], [..]]
+  const nested = Array.isArray(logoRings[0]);
+  const groups = nested ? logoRings : [logoRings];
+  return groups.filter((g) => g && g.length);
+}
+
+/** Returns { parts, preview, info } — parts feed the 3MF, preview feeds the 3D view. */
 export function buildKeycap(p, logoRings) {
   resetTriStats();
   const stemTop = Math.max(p.stemSlotDepth, p.cavityH) + 0.3;
@@ -61,23 +88,40 @@ export function buildKeycap(p, logoRings) {
   const preview = [{ mesh: cap, kind: 'cap' }, { mesh: stem, kind: 'cap' }];
   const info = { stemTop, roofT: p.capH - p.cavityH };
 
-  if (logoRings && logoRings.length) {
-    const rings = placeLogo(logoRings, p);
+  const groups = inkGroups(logoRings);
+  if (groups.length) {
+    // Each ink is placed with the SAME transform, computed from all inks together,
+    // or the colours would be scaled and centred independently and come apart.
+    const all = groups.flat();
+    const fit = logoFit(all, p);
+    const placed = groups.map((g) => applyFit(g, fit));
+    let id = 3;
+    info.inks = groups.length;
+
     if (p.logoMode === 'raised') {
-      const prism = buildPrism(rings, p.capH - 0.01, p.capH + p.logoDepth).weld();
-      parts.push({ id: 3, name: 'Legend', mesh: prism, extruder: 2, subtype: 'normal_part' });
-      preview.push({ mesh: prism, kind: 'logo' });
+      placed.forEach((rings, i) => {
+        const prism = buildPrism(rings, p.capH - 0.01, p.capH + p.logoDepth).weld();
+        parts.push({ id: id++, name: groups.length > 1 ? `Legend ink ${i + 1}` : 'Legend',
+                     mesh: prism, extruder: 2 + i, subtype: 'normal_part' });
+        preview.push({ mesh: prism, kind: 'logo', ink: i });
+      });
     } else {
       const roofT = p.capH - p.cavityH;
       const d = p.logoMode === 'through' ? roofT : Math.min(p.logoDepth, roofT - 0.4);
       const z0 = p.capH - d;
-      const cut = buildPrism(rings, z0 - (p.logoMode === 'through' ? 0.4 : 0), p.capH + 0.3).weld();
-      const fill = buildPrism(rings, z0, p.capH).weld();
-      parts.push({ id: 3, name: 'Legend cutout', mesh: cut, subtype: 'negative_part' });
-      parts.push({ id: 4, name: 'Legend', mesh: fill, extruder: 2, subtype: 'normal_part' });
-      // flush with the cap's top face -> nudge the preview copy so the depth
-      // buffer has a winner (the exported geometry stays exact)
-      preview.push({ mesh: fill, kind: 'logo', zBias: 0.012 });
+      // one cutout for every ink together: the recess is the same pocket
+      // whatever colour goes in it, and one negative part is one boolean
+      const cut = buildPrism(all.map((r) => applyFit([r], fit)[0]),
+        z0 - (p.logoMode === 'through' ? 0.4 : 0), p.capH + 0.3).weld();
+      parts.push({ id: id++, name: 'Legend cutout', mesh: cut, subtype: 'negative_part' });
+      placed.forEach((rings, i) => {
+        const fill = buildPrism(rings, z0, p.capH).weld();
+        parts.push({ id: id++, name: groups.length > 1 ? `Legend ink ${i + 1}` : 'Legend',
+                     mesh: fill, extruder: 2 + i, subtype: 'normal_part' });
+        // flush with the cap's top face -> nudge the preview copy so the depth
+        // buffer has a winner (the exported geometry stays exact)
+        preview.push({ mesh: fill, kind: 'logo', ink: i, zBias: 0.012 });
+      });
       info.legendDepth = d;
     }
   }
@@ -121,13 +165,17 @@ export function layout(count, capW, capD, plate = 256) {
 
 export function exportKeycap3mf(p, logoRings, count = 1, plate = 256) {
   const { parts } = orientForPrint(buildKeycap(p, logoRings).parts, p.logoMode, p.flip);
-  const twoColour = parts.some((x) => x.extruder === 2);
+  // one filament slot per extruder actually used, in order
+  const top = parts.reduce((m, x) => Math.max(m, x.extruder || 1), 1);
+  const inks = p.inkColors && p.inkColors.length
+    ? p.inkColors : [p.logoColor || '#FFFFFF'];
+  const filaments = [p.capColor || '#F5820B'];
+  for (let i = 0; i + 1 < top; i++) filaments.push(inks[i] || inks[inks.length - 1] || '#FFFFFF');
   return build3mf({
     parts,
     copies: layout(count, p.capW, p.capD, plate),
     title: p.name || 'Keycap',
-    filaments: p.embedFilaments !== false && twoColour
-      ? [p.capColor || '#F5820B', p.logoColor || '#FFFFFF'] : null,
+    filaments: p.embedFilaments !== false && top > 1 ? filaments : null,
   });
 }
 

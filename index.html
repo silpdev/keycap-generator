@@ -273,11 +273,18 @@ table.spec td.n{text-align:right;white-space:nowrap}
 
       <fieldset>
         <legend>Xuất file</legend>
-        <div class="colors">
-          <label><input id="capColor" type="color"> Màu thân</label>
-          <label><input id="logoColor" type="color"> Màu logo</label>
+        <div class="row wide" style="margin-bottom:8px">
+          <div class="seg" id="inkCount">
+            <button type="button" data-v="1">2 màu</button>
+            <button type="button" data-v="2">3 màu</button>
+            <button type="button" data-v="3">4 màu</button>
+          </div>
         </div>
-        <label class="check"><input id="embedFilaments" type="checkbox" checked> Khai báo sẵn 2 filament trong file</label>
+        <div class="colors" id="colorRow">
+          <label><input id="capColor" type="color"> Thân cap</label>
+        </div>
+        <p class="note" id="inkInfo" style="margin-top:6px"></p>
+        <label class="check"><input id="embedFilaments" type="checkbox" checked> Khai báo sẵn filament trong file</label>
         <div class="row wide" style="margin-bottom:9px;margin-top:9px">
           <div class="seg" id="flip">
             <button type="button" data-v="auto">Hướng tự động</button>

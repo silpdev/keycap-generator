@@ -16,8 +16,12 @@
     'logoSize','logoDepth','logoRot','logoDx','logoDy','count','plate'];
 
   let P = { ...PRESETS[Object.keys(PRESETS)[0]], logoRot: 0, logoDx: 0, logoDy: 0, mirror: false,
-            count: 1, plate: 256, flip: 'auto', embedFilaments: true, name: 'Keycap' };
+            count: 1, plate: 256, flip: 'auto', embedFilaments: true, name: 'Keycap',
+            inkCount: 1, inkColors: ['#F2F4EC'] };
+  // One ring set per ink colour.  A single-ink logo is one group, so everything
+  // downstream sees the same shape whether you asked for 2 colours or 4.
   let logoRings = DEFAULT_LOGO;      // rings in arbitrary units; placeLogo rescales
+  let inkNote = '';
   let rawField = null;               // {f, w, h} coverage raster of an uploaded file
   let logoName = 'Hình mẫu có sẵn';
   let logoSlug = 'keycap';
@@ -51,8 +55,10 @@
     [...$('flip').children].forEach((b) =>
       b.setAttribute('aria-pressed', b.dataset.v === P.flip));
     $('capColor').value = P.capColor || '#7E8A7C';
-    $('logoColor').value = P.logoColor || '#F2F4EC';
     $('embedFilaments').checked = P.embedFilaments !== false;
+    [...$('inkCount').children].forEach((b) =>
+      b.setAttribute('aria-pressed', +b.dataset.v === (P.inkCount || 1)));
+    drawSwatches();
     $('logoDepth').previousElementSibling.textContent =
       P.logoMode === 'raised' ? 'Cao logo' : P.logoMode === 'through' ? 'Sâu (tự động)' : 'Sâu khắc';
     $('logoDepth').disabled = P.logoMode === 'through';
@@ -72,8 +78,43 @@
     });
   }
   $('mirror').addEventListener('change', () => { P.mirror = $('mirror').checked; rebuild(); });
-  for (const k of ['capColor', 'logoColor'])
-    $(k).addEventListener('input', () => { P[k] = $(k).value; upload(); render(); });
+  $('capColor').addEventListener('input', () => { P.capColor = $('capColor').value; upload(); render(); });
+  [...$('inkCount').children].forEach((b) => {
+    b.onclick = () => {
+      P.inkCount = +b.dataset.v;
+      syncInputs();
+      revectorize();                 // the ink count changes how the artwork is read
+      rebuild();
+    };
+  });
+
+  /**
+   * One picker per filament slot.  They are rebuilt rather than pre-declared
+   * because the count is a user choice, and their values are filled from the
+   * colours found in the artwork — a brand mark already knows what colour it is.
+   */
+  function drawSwatches() {
+    const row = $('colorRow');
+    [...row.querySelectorAll('.ink')].forEach((n) => n.remove());
+    const n = groupCount();
+    for (let i = 0; i < n; i++) {
+      const lab = document.createElement('label');
+      lab.className = 'ink';
+      const inp = document.createElement('input');
+      inp.type = 'color';
+      inp.value = P.inkColors[i] || '#F2F4EC';
+      inp.addEventListener('input', () => {
+        P.inkColors = P.inkColors.slice();
+        P.inkColors[i] = inp.value;
+        upload(); render();
+      });
+      lab.appendChild(inp);
+      lab.appendChild(document.createTextNode(n > 1 ? ` Mực ${i + 1}` : ' Màu logo'));
+      row.appendChild(lab);
+    }
+    $('inkInfo').textContent = inkNote;
+  }
+  const groupCount = () => Math.max(1, inkGroups(logoRings).length);
   $('embedFilaments').addEventListener('change', () => { P.embedFilaments = $('embedFilaments').checked; });
   [...$('logoMode').children].forEach((b) => {
     b.onclick = () => { P.logoMode = b.dataset.v; syncInputs(); rebuild(); };
@@ -91,7 +132,7 @@
   // ---------------------------------------------------------- logo input
   $('logoFile').addEventListener('change', (e) => { if (e.target.files[0]) takeFile(e.target.files[0]); });
   $('clearLogo').onclick = () => {
-    rawField = null; logoRings = null; logoName = ''; logoSlug = 'keycap'; logoInfo = '';
+    rawField = null; logoRings = null; logoName = ''; logoSlug = 'keycap'; logoInfo = ''; inkNote = '';
     $('legendText').value = ''; $('logoFile').value = ''; textJob++;
     $('fileName').textContent = 'Chọn file SVG hoặc PNG';
     $('logoInfo').textContent = '';
@@ -171,7 +212,10 @@
       if (hasAlpha) f[p] = d[i + 3] / 255;
       else f[p] = 1 - (0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]) / 255;
     }
-    return { f, w: c.width, h: c.height, srcNote, small: !isSvg && Math.max(nw, nh) < 256 };
+    // keep the pixels too: splitting the logo by ink colour needs the actual
+    // colours, and re-reading the file on every change would be wasteful
+    return { f, rgba: d, w: c.width, h: c.height, srcNote,
+             small: !isSvg && Math.max(nw, nh) < 256 };
   }
 
   /**
@@ -257,7 +301,7 @@
       textJob++;
       $('fileName').textContent = file.name;
       revectorize();
-      if (!logoRings || !logoRings.length) toast('Không tách được hình — thử kéo thanh “ngưỡng tách hình”');
+      if (!inkGroups(logoRings).length) toast('Không tách được hình — thử kéo thanh “ngưỡng tách hình”');
       else if (rawField.small) toast('Ảnh nguồn nhỏ hơn 256 px nên chi tiết mảnh sẽ bị nhoè — dùng SVG hoặc ảnh lớn hơn');
       rebuild();
     } catch (err) {
@@ -266,15 +310,42 @@
   }
 
   function revectorize() {
-    if (!rawField) { logoInfo = ''; return; }
+    if (!rawField) { logoInfo = ''; inkNote = ''; return; }
     const iso = parseFloat($('thr').value);
-    logoRings = rasterToRings(rawField.f, rawField.w, rawField.h,
+    const trace = (field) => rasterToRings(field, rawField.w, rawField.h,
       { pxPerMM: 1, tolPx: 0.35, minArea: 24, iso });
-    const holes = logoRings.reduce((s, r) => s + r.holes.length, 0);
-    const pts = logoRings.reduce((s, r) => s + r.outer.length +
+
+    const want = Math.max(1, Math.min(3, P.inkCount || 1));
+    inkNote = '';
+    if (want > 1 && rawField.rgba) {
+      const { inks, dropped } = inkColours(rawField.rgba, want);
+      if (inks.length > 1) {
+        const fields = inkFields(rawField.rgba, rawField.w, rawField.h, inks);
+        logoRings = fields.map(trace).filter((g) => g.length);
+        // The artwork's own colours are the best default for the filament slots.
+        P.inkColors = inks.slice(0, logoRings.length).map((x) => x.hex);
+        inkNote = `Tách được ${inks.length} màu mực từ ảnh: ` +
+          inks.map((x) => `${x.hex} ${(x.share * 100).toFixed(0)}%`).join(' · ') +
+          (dropped ? ` (bỏ ${dropped} nhóm chỉ là viền chống răng cưa)` : '');
+      } else {
+        logoRings = [trace(rawField.f)];
+        inkNote = 'Ảnh này chỉ có một màu mực — chọn "2 màu" thôi là đủ.';
+      }
+    } else {
+      logoRings = [trace(rawField.f)];
+      if (want > 1) inkNote = 'Legend bằng chữ chỉ có một màu — muốn nhiều màu thì dùng ảnh có sẵn nhiều màu.';
+    }
+
+    const groups = inkGroups(logoRings);
+    const all = groups.flat();
+    const holes = all.reduce((s, r) => s + r.holes.length, 0);
+    const pts = all.reduce((s, r) => s + r.outer.length +
       r.holes.reduce((a, h) => a + h.length, 0), 0);
-    logoInfo = `${rawField.srcNote} · ${logoRings.length} vùng, ${holes} lỗ, ${pts} điểm`;
+    logoInfo = `${rawField.srcNote} · ` +
+      (groups.length > 1 ? `${groups.length} màu mực · ` : '') +
+      `${all.length} vùng, ${holes} lỗ, ${pts} điểm`;
     $('logoInfo').textContent = logoInfo;
+    drawSwatches();
   }
 
   // ------------------------------------------------------------- rebuild
@@ -302,7 +373,7 @@
     const armClr = P.stemArm - MX_POST_ARM;
     const legDepth = P.logoMode === 'through' ? roofT
       : P.logoMode === 'recessed' ? Math.min(P.logoDepth, roofT - 0.4) : P.logoDepth;
-    const totalH = P.capH + (P.logoMode === 'raised' && logoRings ? P.logoDepth : 0);
+    const totalH = P.capH + (P.logoMode === 'raised' && inkGroups(logoRings).length ? P.logoDepth : 0);
     const faceDown = P.flip === 'down' || (P.flip === 'auto' && P.logoMode !== 'raised');
     return { inW, inD, roofT, stemWall, clr, armClr, legDepth, totalH, faceDown, cavTop,
              stemTop: Math.max(P.stemSlotDepth, P.cavityH) + 0.3 };
@@ -314,14 +385,26 @@
   // placed, so cache on exactly that.
   let strokeKey = '', strokeVal = null;
   function strokeInfo() {
-    if (!logoRings || !logoRings.length) return null;
+    const groups = inkGroups(logoRings);
+    if (!groups.length) return null;
     const line = parseFloat($('lineWidth').value) || 0.42;
-    const key = [logoName, logoRings.length, P.logoSize, P.logoRot, P.logoDx, P.logoDy,
-                 P.mirror ? 1 : 0, line].join('|');
+    const key = [logoName, groups.length, groups.map((g) => g.length).join(','),
+                 P.logoSize, P.logoRot, P.logoDx, P.logoDy, P.mirror ? 1 : 0, line].join('|');
     if (key !== strokeKey) {
       strokeKey = key;
-      try { strokeVal = legendPrintability(placeLogo(logoRings, P), { line, logoSize: P.logoSize }); }
-      catch (e) { strokeVal = null; }
+      try {
+        // Every ink shares one fit, and every ink has to survive on its own — a
+        // colour whose strokes are too thin is lost whatever the others do.
+        const fit = logoFit(groups.flat(), P);
+        const each = groups.map((g) =>
+          legendPrintability(applyFit(g, fit), { line, logoSize: P.logoSize }));
+        const worst = each.reduce((a, b) => (b && (!a || b.min < a.min) ? b : a), null);
+        strokeVal = worst && { ...worst,
+          lost: each.reduce((n, v) => n + (v ? v.lost : 0), 0),
+          risky: each.reduce((n, v) => n + (v ? v.risky : 0), 0),
+          inks: each.length,
+          worstInk: each.indexOf(worst) + 1 };
+      } catch (e) { strokeVal = null; }
     }
     return strokeVal;
   }
@@ -357,7 +440,7 @@
       d.roofT < 1.2 ? 'Mái cap mỏng hơn 1.2 mm — bấm nhiều sẽ lún.'
       : (P.logoMode !== 'raised' && d.legDepth < 0.3) ? 'Mái cap quá mỏng để khắc logo sâu như vậy. Giảm “sâu khắc” hoặc giảm “sâu hốc switch”.' : null);
 
-    if (logoRings) {
+    if (inkGroups(logoRings).length) {
       const room = Math.min(P.topW, P.topD);
       add('Logo trên mặt trên', `${P.logoSize.toFixed(1)} / ${room.toFixed(1)} mm`,
         P.logoSize <= room - 0.8,
@@ -374,7 +457,8 @@
         add('Nét mảnh nhất', `${pr.min.toFixed(2)} / ${pr.need.toFixed(2)} mm`,
           pr.min >= pr.need,
           pr.lost
-            ? `${pr.lost} vùng của logo có nét mảnh nhất ${pr.min.toFixed(2)} mm — chưa tới một đường đùn ` +
+            ? `${pr.lost} vùng của logo` + (pr.inks > 1 ? ` (mảnh nhất ở mực ${pr.worstInk})` : '') +
+              ` có nét mảnh nhất ${pr.min.toFixed(2)} mm — chưa tới một đường đùn ` +
               `${pr.line.toFixed(2)} mm, nên máy KHÔNG in được chúng bằng filament 2: mấy vùng đó sẽ ra ` +
               `màu thân cap, chỉ còn nổi mờ mờ (mất chữ). Cần logo rộng ${pr.sizeFor.toFixed(1)} mm mới đủ nét` +
               (fits ? '.' : `, mà mặt trên chỉ chứa được ${(room - 0.8).toFixed(1)} mm — ` +
@@ -420,8 +504,9 @@
 
   /** x-intervals where the placed legend rings cross the section plane y=0. */
   function legendSpansAtY0() {
-    if (!logoRings) return [];
-    const rings = placeLogo(logoRings, P);
+    const groups = inkGroups(logoRings);
+    if (!groups.length) return [];
+    const rings = applyFit(groups.flat(), logoFit(groups.flat(), P));
     const xs = [];
     for (const r of rings) for (const ring of [r.outer, ...(r.holes || [])]) {
       for (let i = 0; i < ring.length; i++) {
@@ -467,7 +552,7 @@
     rect(solid, -P.stemDia / 2, P.stemDia / 2, 0, P.cavityH);
     rect(solid, -P.stemSpan / 2, P.stemSpan / 2, 0, slotD);
     const spans = legendSpansAtY0();
-    if (P.logoMode !== 'raised' && logoRings)
+    if (P.logoMode !== 'raised' && inkGroups(logoRings).length)
       for (const [x0, x1] of spans) rect(solid, x0, x1, P.capH - d.legDepth, P.capH);
 
     // 45° section hatch inside the material
@@ -485,7 +570,7 @@
     g.beginPath(); g.moveTo(X(-P.capW / 2 - 3), Y(0)); g.lineTo(X(P.capW / 2 + 3), Y(0)); g.stroke();
 
     // ---- legend
-    if (logoRings && spans.length) {
+    if (inkGroups(logoRings).length && spans.length) {
       g.fillStyle = accent;
       for (const [x0, x1] of spans) {
         const z0 = P.logoMode === 'raised' ? P.capH : P.capH - d.legDepth;
@@ -607,10 +692,13 @@
   function upload() {
     if (!glOK || !built) return;
     const capCol = rgb(P.capColor || cssVar('--cap-face'));
-    const logoCol = rgb(P.logoColor || cssVar('--logo-lit'));
+    const inkCols = (P.inkColors && P.inkColors.length ? P.inkColors : [cssVar('--logo-lit')])
+      .map((c) => rgb(c));
     const out = [];
     for (const item of built.preview) {
-      const M = item.mesh, c = item.kind === 'logo' ? logoCol : capCol;
+      const M = item.mesh;
+      const c = item.kind === 'logo'
+        ? (inkCols[item.ink || 0] || inkCols[inkCols.length - 1]) : capCol;
       for (const f of M.F) {
         const a = M.V[f[0]], b = M.V[f[1]], q = M.V[f[2]];
         const u = [b[0]-a[0], b[1]-a[1], b[2]-a[2]], v = [q[0]-a[0], q[1]-a[1], q[2]-a[2]];
@@ -750,7 +838,7 @@
   // recessed or through legend simply is not in the file: what comes out is a
   // blank cap.  Say so instead of letting it look like an export that worked.
   $('dlstl').onclick = () => {
-    const lost = logoRings && P.logoMode !== 'raised'
+    const lost = inkGroups(logoRings).length && P.logoMode !== 'raised'
       ? (P.logoMode === 'through'
           ? '.stl không mang được phần khoét nên logo xuyên sáng mất hẳn, cap ra đặc. Dùng .3mf.'
           : '.stl không mang được phần khoét nên logo khắc lõm mất, cap ra trơn. Dùng .3mf.')
@@ -834,7 +922,7 @@
   };
 
   $('dljson').onclick = () => {
-    const cfg = { app: 'xuong-keycap-mx', v: 1, params: P, logo: logoName || null,
+    const cfg = { app: 'xuong-keycap-mx', v: 2, params: P, logo: logoName || null,
                   logoRings: logoRings || null };
     offer(`${slug()}-thongso.json`, new TextEncoder().encode(JSON.stringify(cfg, null, 1)));
   };

@@ -36,8 +36,10 @@ yourself. This one asks for the numbers directly and then checks them:
 - **A switch holder.** A base you press a real MX switch into, so there is something
   to test the calibration pieces and the finished caps against — with a keyring lug,
   because one switch on a base is a fidget toy whether you meant it to be or not.
-- **Two-colour 3MF.** Cap and legend become separate parts with their own filament,
-  and the file declares two filament slots so the assignment survives the import.
+- **Two, three or four colours.** The artwork already knows what colour it is, so
+  the logo is split by its own colours rather than by hand: cluster, trace each
+  cluster, one part and one filament slot per ink. Cap and legend parts each carry
+  their filament, and the file declares the slots so the assignment survives import.
 
 ## What it checks for you
 
@@ -56,6 +58,36 @@ keystroke and explains each failure with the number you need to change:
 | Legend vs top face | legend wider than the top face |
 | Thinnest stroke | any legend region narrower than two extrusion widths |
 | Print orientation | face-up when it does not have to be (see below) |
+
+## Colours come from the artwork
+
+A brand mark carries its colours in the file. Asking which regions are navy and
+which are red would be asking you to re-enter what the PNG already says, so
+`src/palette.mjs` clusters the artwork's colours instead and traces each cluster
+separately. Drop in a two-colour wordmark, pick "3 màu", and the filament swatches
+come up filled with the logo's own hex values.
+
+Two details decide whether that is usable rather than merely clever:
+
+**It is deterministic.** k-means from random seeds gives a different answer each
+time you drop in the same file, which is intolerable in a tool whose output you
+print. The seeds come from the most populated buckets of a coarse colour
+histogram, chosen farthest-first, weighted by population — no randomness anywhere,
+so the same file always yields the same inks in the same order.
+
+**The colours stay registered.** Every ink shares one fit, computed from all inks
+together. Scaling and centring each colour on its own bounding box is the obvious
+implementation and it pulls the logo apart — each colour grows to fill the whole
+logo size. There is a test for exactly that.
+
+Asking for more inks than the artwork has does not invent them: a third "colour"
+made only of the antialiased pixels along a boundary is dropped, and the panel says
+it found two. Boundaries between inks use inverse-distance membership rather than a
+hard per-pixel label, so the contour lands where the colours actually meet with
+sub-pixel accuracy instead of tracing a staircase.
+
+Three colours means three filament changes per layer in the legend's layers. That
+is the printer's problem, not the file's, but it is worth knowing before you slice.
 
 ## The check that costs the most prints
 
@@ -211,6 +243,12 @@ npm test      # no dependencies — the core and the tests use only Node builtin
   lower line in the wrong colour, plus bars, discs and an annulus with known
   answers. Also checks the recommended logo size actually clears the threshold, and
   that the advice tracks the nozzle.
+- **`test_palette.mjs`** — colour splitting: recovers the exact colours from a
+  synthetic two-ink mark, proves the ink fields are disjoint and cover everything,
+  proves the same file twice gives identical results, and on the real brand mark
+  checks the parts get extruders 1/1/2/3, the 3MF declares three filaments in the
+  logo's own colours, and — the one that matters — that the inks share one fit
+  instead of each being scaled to fill the frame.
 - **`test_mesh.mjs`** — writes each part to `out/*.stl` and prints the dimensions.
 
 ## Development
@@ -234,6 +272,7 @@ CI runs the tests and then fails if `docs/index.html` does not match `src/`.
 | `src/calibration.mjs` | Seven-segment numerals and the slot calibration plate |
 | `src/holder.mjs` | MX plate-mount holder base, with its own fit checks |
 | `src/stroke.mjs` | Distance transform over the legend, to catch strokes too thin to print in their own colour |
+| `src/palette.mjs` | Deterministic colour clustering, one coverage field per ink |
 | `src/app.js` | UI: WebGL preview, section drawing, tolerance table |
 | `src/shell.html` | Markup and CSS, shared by the dev build and the bundle |
 | `bundle.mjs` | Inlines everything into `docs/index.html` |
@@ -252,8 +291,8 @@ declaring two filament slots in the colours you picked. It contains only the
 filament arrays, no printer or print preset, so your machine profile is untouched.
 If Bambu asks whether to load the project's settings, say yes.
 
-Two colours still need two filaments in the project. Without an AMS or a second
-slot, no file can produce them.
+Two colours still need two filaments in the project, three need three. Without an
+AMS or enough slots, no file can produce them.
 
 The `.stl` button is there for single-colour caps and nothing else. STL has no
 concept of a negative part, so a recessed or through legend simply is not in the

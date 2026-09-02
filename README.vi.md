@@ -32,6 +32,9 @@ hỏi thẳng số đo rồi kiểm tra lại:
 - **Đế giữ switch.** Đế để ấn switch MX thật vào, có chỗ mà thử mấy mẩu hiệu chuẩn
   và thử cap in xong — kèm tai móc khoá, vì một cái switch trên đế thì kiểu gì cũng
   thành đồ fidget.
+- **2, 3 hay 4 màu.** Logo tự mang màu của nó rồi, nên tool tách theo màu của chính
+  ảnh chứ không bắt bạn chỉ tay từng vùng: gom nhóm màu, tách hình từng nhóm, mỗi
+  màu mực một part và một slot filament.
 - **3MF hai màu.** Thân cap và logo thành hai part riêng có filament riêng, và file
   khai báo sẵn hai slot filament để phần gán màu không bị mất khi import.
 
@@ -52,6 +55,34 @@ lần bạn gõ, và mỗi lỗi đều nói rõ phải sửa con số nào:
 | Logo vs mặt trên | logo rộng hơn mặt trên |
 | Nét mảnh nhất | có vùng logo mảnh hơn hai đường đùn |
 | Hướng in | in ngửa trong khi không cần thiết (xem dưới) |
+
+## Màu lấy từ chính logo
+
+Logo brand đã mang màu trong file. Bắt bạn chỉ vùng nào navy vùng nào đỏ là bắt
+nhập lại thứ file đã nói rồi, nên `src/palette.mjs` gom nhóm màu của ảnh rồi tách
+hình từng nhóm. Kéo logo hai màu vào, chọn "3 màu", mấy ô filament tự điền đúng mã
+màu của logo.
+
+Hai chi tiết quyết định chuyện này dùng được thật chứ không chỉ nghe hay:
+
+**Nó deterministic.** k-means seed ngẫu nhiên thì mỗi lần kéo cùng một file ra một
+kết quả khác — không chấp nhận được với tool mà output đem đi in. Seed lấy từ các
+bucket đông nhất của histogram màu thô, chọn theo kiểu xa nhất trước, có trọng số
+theo số pixel — không có chỗ nào ngẫu nhiên, nên cùng một file luôn ra cùng bộ màu
+theo cùng thứ tự.
+
+**Các màu vẫn khớp nhau.** Mọi màu mực dùng chung **một** phép fit, tính từ tất cả
+các màu gộp lại. Scale và căn giữa từng màu theo bounding box riêng của nó là cách
+làm hiển nhiên, và nó xé logo ra — mỗi màu phình lên cho đầy khung logo. Có test
+đúng cho chuyện đó.
+
+Xin nhiều màu hơn ảnh có thì nó không bịa ra: nhóm "màu" thứ ba chỉ gồm pixel viền
+chống răng cưa sẽ bị bỏ, và panel nói rõ chỉ tìm được hai. Ranh giữa hai màu dùng
+membership nghịch đảo khoảng cách thay vì gán cứng từng pixel, nên đường biên nằm
+đúng chỗ hai màu gặp nhau với độ chính xác dưới pixel, không bị răng cưa bậc thang.
+
+Ba màu nghĩa là ba lần đổi filament mỗi lớp ở phần logo. Đó là việc của máy in không
+phải của file, nhưng biết trước thì đỡ bất ngờ lúc slice.
 
 ## Cái kiểm tra đáng tiền in nhất
 
@@ -195,6 +226,11 @@ npm test      # không cần cài gì — core và test chỉ dùng builtin củ
   chính xác của shapely trên đúng logo hai tầng đã in ra mất màu ở dòng dưới, kèm
   thanh, đĩa, vành khuyên có đáp án biết trước. Kiểm cả việc cỡ logo gợi ý có thật sự
   đủ nét, và kết luận có đổi theo đầu phun.
+- **`test_palette.mjs`** — tách màu: lấy lại đúng màu đã vẽ vào một hình hai mực
+  tổng hợp, chứng minh các trường màu rời nhau và phủ hết, chứng minh cùng file gọi
+  hai lần ra y hệt, và trên logo brand thật thì kiểm part ra extruder 1/1/2/3, 3MF
+  khai đúng ba filament theo màu logo, và — cái quan trọng nhất — các mực dùng chung
+  một phép fit chứ không bị mỗi màu phình đầy khung.
 - **`test_mesh.mjs`** — ghi từng part ra `out/*.stl` rồi in kích thước.
 
 ## Phát triển
@@ -218,6 +254,7 @@ CI chạy test rồi báo lỗi nếu `docs/index.html` không khớp với `src
 | `src/calibration.mjs` | Chữ số 7 đoạn và khay hiệu chuẩn khe chân |
 | `src/holder.mjs` | Đế MX plate-mount, kèm phần kiểm tra độ vừa riêng |
 | `src/stroke.mjs` | Distance transform trên logo, bắt nét quá mảnh để in ra đúng màu |
+| `src/palette.mjs` | Gom nhóm màu deterministic, mỗi màu mực một trường phủ |
 | `src/app.js` | UI: preview WebGL, bản vẽ mặt cắt, bảng kiểm tra dung sai |
 | `src/shell.html` | Markup và CSS, dùng chung cho bản dev và bản bundle |
 | `bundle.mjs` | Nhồi tất cả vào `docs/index.html` |
@@ -236,8 +273,8 @@ File này chỉ chứa các mảng filament, không chứa profile máy in hay p
 máy bạn đang chọn không bị đổi. Bambu hỏi có nạp cấu hình của project không thì chọn
 **có**.
 
-Hai màu vẫn cần project có hai filament. Không có AMS hay slot thứ hai thì không file
-nào làm ra được.
+Hai màu vẫn cần project có hai filament, ba màu cần ba. Không có AMS hay không đủ
+slot thì không file nào làm ra được.
 
 Nút `.stl` chỉ để in cap một màu. STL không có khái niệm part trừ, nên logo khắc lõm
 hay xuyên sáng đơn giản là không nằm trong file — bạn nhận được một cái cap trơn. Tool
