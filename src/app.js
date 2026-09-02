@@ -81,6 +81,7 @@
   [...$('flip').children].forEach((b) => {
     b.onclick = () => { P.flip = b.dataset.v; syncInputs(); rebuild(); };
   });
+  $('lineWidth').addEventListener('input', () => { drawSpec(); });
   $('thr').addEventListener('input', () => {
     $('thrV').textContent = parseFloat($('thr').value).toFixed(2);
     revectorize(); rebuild();
@@ -307,6 +308,24 @@
              stemTop: Math.max(P.stemSlotDepth, P.cavityH) + 0.3 };
   }
 
+  // ------------------------------------------------- legend stroke widths
+  // The analysis rasterises the placed rings, so it costs 50-150 ms — far too
+  // much for every keystroke.  It only depends on the rings and how they are
+  // placed, so cache on exactly that.
+  let strokeKey = '', strokeVal = null;
+  function strokeInfo() {
+    if (!logoRings || !logoRings.length) return null;
+    const line = parseFloat($('lineWidth').value) || 0.42;
+    const key = [logoName, logoRings.length, P.logoSize, P.logoRot, P.logoDx, P.logoDy,
+                 P.mirror ? 1 : 0, line].join('|');
+    if (key !== strokeKey) {
+      strokeKey = key;
+      try { strokeVal = legendPrintability(placeLogo(logoRings, P), { line, logoSize: P.logoSize }); }
+      catch (e) { strokeVal = null; }
+    }
+    return strokeVal;
+  }
+
   // ------------------------------------------------------------ spec table
   function drawSpec() {
     const d = derived();
@@ -343,6 +362,28 @@
       add('Logo trên mặt trên', `${P.logoSize.toFixed(1)} / ${room.toFixed(1)} mm`,
         P.logoSize <= room - 0.8,
         P.logoSize > room - 0.8 ? `Logo ${P.logoSize.toFixed(1)} mm tràn khỏi mặt trên ${room.toFixed(1)} mm. Giảm còn ≤ ${(room - 0.8).toFixed(1)} mm.` : null);
+
+      // The one that got away: a legend region narrower than the nozzle can lay
+      // down is printed in the CAP's filament, not its own.  The geometry is
+      // perfect and the slicer says nothing — the letters just come out the wrong
+      // colour, as faint relief.  Nothing downstream can fix it, so it has to be
+      // caught here, before the print.
+      const pr = strokeInfo();
+      if (pr) {
+        const fits = pr.sizeFor <= room - 0.8;
+        add('Nét mảnh nhất', `${pr.min.toFixed(2)} / ${pr.need.toFixed(2)} mm`,
+          pr.min >= pr.need,
+          pr.lost
+            ? `${pr.lost} vùng của logo có nét mảnh nhất ${pr.min.toFixed(2)} mm — chưa tới một đường đùn ` +
+              `${pr.line.toFixed(2)} mm, nên máy KHÔNG in được chúng bằng filament 2: mấy vùng đó sẽ ra ` +
+              `màu thân cap, chỉ còn nổi mờ mờ (mất chữ). Cần logo rộng ${pr.sizeFor.toFixed(1)} mm mới đủ nét` +
+              (fits ? '.' : `, mà mặt trên chỉ chứa được ${(room - 0.8).toFixed(1)} mm — ` +
+                'cỡ cap này không in nổi phần chữ nhỏ đó. Dùng bản logo không có dòng chữ nhỏ, hoặc bỏ nó đi.')
+            : pr.risky
+              ? `${pr.risky} vùng chỉ rộng ${pr.min.toFixed(2)} mm, tức 1 đường đùn — in ra được nhưng nét ` +
+                `sẽ đứt quãng. Cần ${pr.sizeFor.toFixed(1)} mm để chắc ăn.`
+              : null);
+      }
     }
     add('Hướng in khi xuất', d.faceDown ? 'úp mặt trên xuống' : 'ngửa mặt trên lên',
       d.faceDown || P.logoMode === 'raised',

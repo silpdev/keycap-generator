@@ -23,7 +23,7 @@
     "dev": "vite",
     "bundle": "node bundle.mjs",
     "sample-logo": "node tools/make-sample-logo.mjs",
-    "test": "node test/test_tri.mjs && node test/test_vec.mjs && node test/test_export.mjs && node test/test_cal.mjs && node test/test_holder.mjs && node test/test_mesh.mjs"
+    "test": "node test/test_tri.mjs && node test/test_vec.mjs && node test/test_export.mjs && node test/test_cal.mjs && node test/test_holder.mjs && node test/test_stroke.mjs && node test/test_mesh.mjs"
   },
   "devDependencies": {
     "vite": "^5.4.0"

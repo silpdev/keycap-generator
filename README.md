@@ -54,7 +54,31 @@ keystroke and explains each failure with the number you need to change:
 | Cavity at the ceiling | under 9.5 mm, the switch's upper housing fouls the taper |
 | Roof | under 1.2 mm, or too thin for the engraving depth |
 | Legend vs top face | legend wider than the top face |
+| Thinnest stroke | any legend region narrower than two extrusion widths |
 | Print orientation | face-up when it does not have to be (see below) |
+
+## The check that costs the most prints
+
+A two-colour legend fails silently. The mesh is perfect, the slicer accepts it
+without a word, and the thin strokes come out **in the cap's colour** — you get
+faint relief where the letters should be. It happened here with a two-tier
+wordmark: the big letters printed in the second filament and the small line under
+them printed in white, because a region narrower than one extrusion cannot be laid
+down in its own filament, and nothing downstream can fix that.
+
+So `src/stroke.mjs` measures it. It rasterises the placed legend at 0.01 mm,
+takes a Euclidean distance transform, and reports the width of each region **at its
+widest point** — the max inscribed circle diameter. If even the widest point of a
+letter is under two extrusion widths, that letter has no chance. The verdict comes
+with the number you actually need: the logo width that *would* work, scaled off the
+conservative end of the measurement, and whether that width even fits the cap's top
+face. On an 18 mm 1u cap it usually does not, which is the honest answer — drop the
+small line, or move to a bigger cap.
+
+`test_stroke.mjs` checks the measurement against shapely's exact erosion on the
+real logo that failed (agreement within one raster pitch), against bars, discs and
+an annulus where the answer is not open to interpretation, and confirms that the
+size it recommends really does clear the threshold when you scale to it.
 
 ## Calibrating the slot, once
 
@@ -182,6 +206,11 @@ npm test      # no dependencies — the core and the tests use only Node builtin
   fits in them, confirms the outer wall never narrows as z rises (a foot taper
   pointing the wrong way would need support everywhere), and feeds six deliberately
   broken configurations through the checks to make sure each one is actually caught.
+- **`test_stroke.mjs`** — legend stroke widths, against shapely's exact
+  max-inscribed-circle diameters on the real two-tier logo that printed with its
+  lower line in the wrong colour, plus bars, discs and an annulus with known
+  answers. Also checks the recommended logo size actually clears the threshold, and
+  that the advice tracks the nozzle.
 - **`test_mesh.mjs`** — writes each part to `out/*.stl` and prints the dimensions.
 
 ## Development
@@ -204,6 +233,7 @@ CI runs the tests and then fails if `docs/index.html` does not match `src/`.
 | `src/build.mjs` | Presets, part assembly, print orientation, plate layout |
 | `src/calibration.mjs` | Seven-segment numerals and the slot calibration plate |
 | `src/holder.mjs` | MX plate-mount holder base, with its own fit checks |
+| `src/stroke.mjs` | Distance transform over the legend, to catch strokes too thin to print in their own colour |
 | `src/app.js` | UI: WebGL preview, section drawing, tolerance table |
 | `src/shell.html` | Markup and CSS, shared by the dev build and the bundle |
 | `bundle.mjs` | Inlines everything into `docs/index.html` |

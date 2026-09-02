@@ -50,7 +50,29 @@ lần bạn gõ, và mỗi lỗi đều nói rõ phải sửa con số nào:
 | Hốc ở đỉnh | dưới 9.5 mm, vỏ trên switch chạm vào phần vuốt |
 | Mái cap | dưới 1.2 mm, hoặc quá mỏng so với độ sâu khắc |
 | Logo vs mặt trên | logo rộng hơn mặt trên |
+| Nét mảnh nhất | có vùng logo mảnh hơn hai đường đùn |
 | Hướng in | in ngửa trong khi không cần thiết (xem dưới) |
+
+## Cái kiểm tra đáng tiền in nhất
+
+Logo hai màu hỏng một cách im lặng. Mesh đúng, slicer không nói gì, và mấy nét mảnh
+**ra màu thân cap** — chỗ đáng ra là chữ chỉ còn nổi mờ mờ. Đúng chuyện đã xảy ra ở
+đây với một logo hai tầng: dòng chữ lớn in ra đúng filament thứ hai, dòng nhỏ bên dưới
+ra màu trắng, vì một vùng mảnh hơn một đường đùn thì máy không đặt nổi filament riêng
+vào đó, và không có cách nào sửa ở khâu sau.
+
+Nên `src/stroke.mjs` đo thẳng chuyện đó. Nó rasterise logo đã đặt ở 0.01 mm, chạy
+distance transform Euclid, rồi báo bề rộng của từng vùng **ở chỗ dày nhất của vùng
+đó** — tức đường kính vòng tròn nội tiếp lớn nhất. Nếu chỗ dày nhất của một chữ còn
+chưa tới hai đường đùn thì chữ đó không có cơ hội nào. Kết luận đi kèm con số thật sự
+cần: bề rộng logo *sẽ* đủ nét, tính theo phía an toàn của phép đo, và bề rộng đó có
+nằm trong mặt trên của cap hay không. Với cap 1u 18 mm thì thường là không — đó là câu
+trả lời thật: bỏ dòng chữ nhỏ đi, hoặc đổi sang cap lớn hơn.
+
+`test_stroke.mjs` đối chiếu phép đo với erosion chính xác của shapely trên đúng cái
+logo đã in lỗi (lệch trong một bước raster), với thanh, đĩa và vành khuyên là những
+hình có đáp án không tranh cãi được, và kiểm luôn rằng cỡ logo nó gợi ý phóng lên thì
+thật sự đủ nét.
 
 ## Hiệu chuẩn khe chân, một lần cho xong
 
@@ -169,6 +191,10 @@ npm test      # không cần cài gì — core và test chỉ dùng builtin củ
   cả ba phía cùng khoảng cách tới hốc ngàm, xác nhận đáy thật sự bịt kín mặt
   sau (và đặt về 0 thì thật sự hở lại), và đẩy mười ba cấu hình cố ý sai qua phần
   kiểm tra để chắc mỗi lỗi đều bị bắt.
+- **`test_stroke.mjs`** — bề nét logo, đối chiếu với đường kính vòng tròn nội tiếp
+  chính xác của shapely trên đúng logo hai tầng đã in ra mất màu ở dòng dưới, kèm
+  thanh, đĩa, vành khuyên có đáp án biết trước. Kiểm cả việc cỡ logo gợi ý có thật sự
+  đủ nét, và kết luận có đổi theo đầu phun.
 - **`test_mesh.mjs`** — ghi từng part ra `out/*.stl` rồi in kích thước.
 
 ## Phát triển
@@ -191,6 +217,7 @@ CI chạy test rồi báo lỗi nếu `docs/index.html` không khớp với `src
 | `src/build.mjs` | Preset, ghép part, hướng in, xếp cap trên khay |
 | `src/calibration.mjs` | Chữ số 7 đoạn và khay hiệu chuẩn khe chân |
 | `src/holder.mjs` | Đế MX plate-mount, kèm phần kiểm tra độ vừa riêng |
+| `src/stroke.mjs` | Distance transform trên logo, bắt nét quá mảnh để in ra đúng màu |
 | `src/app.js` | UI: preview WebGL, bản vẽ mặt cắt, bảng kiểm tra dung sai |
 | `src/shell.html` | Markup và CSS, dùng chung cho bản dev và bản bundle |
 | `bundle.mjs` | Nhồi tất cả vào `docs/index.html` |
