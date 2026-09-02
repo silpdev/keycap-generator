@@ -3,7 +3,7 @@
 // gives the wrong answer and every cap made afterwards is wrong too.  So measure
 // the slot back out of the finished mesh, and audit each part the same way the
 // keycap parts are audited.
-import { calSpans, buildCalPiece, exportCalibration3mf, exportCalibrationStl,
+import { calSpans, buildCalPiece, exportCalibration3mf,
          numberRings, digitRings, CAL_DEFAULTS } from '../src/calibration.mjs';
 import { signedArea } from '../src/geom.mjs';
 
@@ -91,7 +91,6 @@ for (const span of spans) {
 // ------------------------------------------------------------- whole plate
 console.log('\n--- file xuat ---');
 const mf = exportCalibration3mf();
-const stl = exportCalibrationStl();
 const txt = Buffer.from(mf).toString('latin1');
 const objIds = [...txt.matchAll(/<item objectid="(\d+)"/g)].map((m) => m[1]);
 const resIds = [...txt.matchAll(/<object id="(\d+)" type="model">/g)].map((m) => m[1]);
@@ -99,8 +98,6 @@ console.log(`  3mf ${(mf.length / 1024).toFixed(1)} KB · ${objIds.length} objec
   `${resIds.length} resource${fx(objIds.length === 7 && new Set(resIds).size === resIds.length)}`);
 console.log(`  moi object mot resource rieng${fx(new Set(objIds).size === objIds.length)}`);
 console.log(`  co PK zip + model_settings${fx(txt.startsWith('PK') && txt.includes('model_settings.config'))}`);
-console.log(`  stl ${(stl.length / 1024).toFixed(1)} KB` +
-  fx(stl.length > 84 && (stl.length - 84) % 50 === 0));
 
 // No two pieces may overlap on the plate, or the slicer refuses to slice.
 const pitch = CAL_DEFAULTS.pieceW + 3;

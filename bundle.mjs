@@ -8,7 +8,7 @@ const strip = (f) => fs.readFileSync(f, 'utf8')
   .replace(/^export\s+/gm, '');
 
 const core = ['src/geom.mjs', 'src/vectorize.mjs', 'src/export3mf.mjs', 'src/build.mjs',
-              'src/calibration.mjs']
+              'src/calibration.mjs', 'src/holder.mjs']
   .map((f) => `/* ---- ${f} ---- */\n${strip(f)}`).join('\n');
 const shell = fs.readFileSync('src/shell.html', 'utf8');
 const logo = strip('src/logo_default.mjs');

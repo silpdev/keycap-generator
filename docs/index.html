@@ -306,6 +306,26 @@ table.spec td.n{text-align:right;white-space:nowrap}
           chỉ khác nhau bề rộng khe. Số dập là đơn vị phần trăm mm: <b>425</b> nghĩa là khe 4.25 mm.
           In một màu, <b>không bật support</b>.</p>
       </fieldset>
+
+      <fieldset>
+        <legend>Đế giữ switch</legend>
+        <p class="note" style="margin-top:0">Đế để nhét switch thật vào mà thử khay hiệu chuẩn và thử cap in xong.
+          Chuẩn MX plate-mount giống nhau ở mọi hãng: lỗ vuông <b>14.0 mm</b>, tấm dày <b>1.5 ±0.1 mm</b>,
+          ngàm bung ra bám dưới tấm.</p>
+        <div class="row"><label for="hCount">Số switch</label><input id="hCount" type="number" step="1" min="1" max="12" value="1"><span class="u">cái</span></div>
+        <div class="row"><label for="hPitch">Pitch</label><input id="hPitch" type="number" step="0.01" value="19.05"><span class="u">mm</span></div>
+        <div class="row"><label for="hCut">Lỗ vuông</label><input id="hCut" type="number" step="0.05" value="14.15"><span class="u">mm</span></div>
+        <div class="row"><label for="hPlateT">Dày tấm</label><input id="hPlateT" type="number" step="0.05" value="1.5"><span class="u">mm</span></div>
+        <div class="row"><label for="hWell">Hốc dưới tấm</label><input id="hWell" type="number" step="0.1" value="16.4"><span class="u">mm</span></div>
+        <div class="row"><label for="hWellH">Sâu hốc</label><input id="hWellH" type="number" step="0.5" value="9"><span class="u">mm</span></div>
+        <div class="row"><label for="hBodyW">Bề đế</label><input id="hBodyW" type="number" step="0.5" value="21"><span class="u">mm</span></div>
+        <p class="note" id="hInfo"></p>
+        <ul class="msgs" id="hMsgs" style="margin-top:9px"></ul>
+        <button class="btn ghost" id="dlholder" type="button">Tải đế giữ switch .3mf</button>
+        <p class="note">Lỗ để <b>14.15</b> chứ không phải 14.00: lỗ in FDM luôn co lại, đúng 14.00 là switch không vào.
+          In một màu, <b>không support</b> — đế đã dựng úp mặt lỗ xuống bàn nên không có chỗ nào cần đỡ.
+          In xong lật ngược lại, mặt tấm ở trên, ấn switch xuống tới khi nghe tách.</p>
+      </fieldset>
     </div>
 
     <div class="stage">
@@ -1487,24 +1507,143 @@ function exportCalibration3mf(o = {}, plate = 256) {
                     filaments: null });
 }
 
-function exportCalibrationStl(o = {}) {
-  const p = { ...CAL_DEFAULTS, ...o };
-  const spans = calSpans(p);
-  const meshes = [];
-  const pitch = p.pieceW + 3;
-  spans.forEach((span, i) => {
-    const piece = buildCalPiece(span, p);
-    const dx = (i - (spans.length - 1) / 2) * pitch;
-    for (const q of piece.parts) {
-      if (q.subtype !== 'normal_part') continue;
-      const m = q.mesh.flipped(piece.capH);
-      const t = new Mesh();
-      t.V = m.V.map((v) => [v[0] + dx, v[1], v[2]]);
-      t.F = m.F.map((f) => f.slice());
-      meshes.push(t);
-    }
+// There is deliberately no STL export here.  STL has no concept of a negative
+// part, so the only thing an STL writer could do is drop the engraved numbers —
+// and seven identical unlabelled pieces are worse than no plate at all, because
+// you cannot tell which one fitted.  3MF or nothing.
+
+/* ---- src/holder.mjs ---- */
+// ---------------------------------------------------------------------------
+// Switch holder — a base you press a real MX switch into.
+//
+// Cherry's plate-mount spec is the same for every MX and MX clone: a 14 × 14 mm
+// square cutout in a plate 1.5 ±0.1 mm thick, with two clips on the bottom
+// housing that spring outward and latch under the plate.  Plate top to PCB top
+// is 5 mm, so about 3.5 mm of housing hangs below a 1.5 mm plate, and the pins
+// of a plate-mount switch add roughly 3 mm more.  Everything below the plate
+// therefore needs to be empty.
+//
+// Printing decides the shape.  Modelled plate-down, the cutout lands in the
+// first layer, the clearance well opens towards the nozzle, and the outer wall
+// leans *outward* as it rises — which is the self-supporting direction — so the
+// finished part has a wide, stable foot with no overhang anywhere and no
+// support to dig out of the well.  Turn it over after printing and the plate is
+// on top where the switch goes in.
+// ---------------------------------------------------------------------------
+
+
+const MX = {
+  cutout: 14.0,        // plate cutout, per Cherry's plate-mount spec
+  plateT: 1.5,         // nominal plate thickness the clips are cut for
+  housing: 15.6,       // top housing footprint, sits on the plate
+  belowPlate: 3.5,     // bottom housing below a 1.5 mm plate (5 mm from plate top)
+  pins: 3.0,           // plate-mount pins below that
+};
+
+const HOLDER_DEFAULTS = {
+  count: 1,
+  pitch: 19.05,        // standard keyboard spacing; irrelevant when count is 1
+  // 14.0 nominal + 0.15: an FDM hole comes out undersize, and a cutout that is
+  // 0.1 mm tight will not take the switch at all.
+  cut: 14.15,
+  plateT: 1.5,
+  well: 16.4,          // clearance under the plate — the clips spring outward
+  wellH: 9.0,          // deep enough for housing + pins with room to spare
+  bodyW: 21.0,         // plate footprint per cell
+  footGrow: 7.0,       // how much wider the foot is than the plate, total
+  cornerR: 2.0,
+};
+
+/** Square cutout ring, centred at (cx, 0), with a small corner radius. */
+const cell = (size, cx, r = 0.4) =>
+  ({ outer: roundedRect(size, size, r, 3).map((p) => [p[0] + cx, p[1]]), holes: [] });
+
+/** Centres of the cells along x, the row centred on the origin. */
+function cellCentres(p = {}) {
+  const o = { ...HOLDER_DEFAULTS, ...p };
+  const n = Math.max(1, Math.min(12, Math.round(o.count)));
+  return Array.from({ length: n }, (_, i) => (i - (n - 1) / 2) * o.pitch);
+}
+
+function holderSize(p = {}) {
+  const o = { ...HOLDER_DEFAULTS, ...p };
+  const c = cellCentres(o);
+  const span = c.length > 1 ? c[c.length - 1] - c[0] : 0;
+  return { W: span + o.bodyW, D: o.bodyW, H: o.plateT + o.wellH, cells: c };
+}
+
+/**
+ * The solid body: plate footprint at z=0 growing to the foot at the top of the
+ * print.  Leaning outward at ~25° from vertical, so every layer is supported by
+ * the one below it.
+ */
+function buildBody(p) {
+  const o = { ...HOLDER_DEFAULTS, ...p };
+  const { W, D, H } = holderSize(o);
+  const m = new Mesh();
+  const lo = roundedRect(W, D, o.cornerR, 8);
+  const hi = roundedRect(W + o.footGrow, D + o.footGrow, o.cornerR + o.footGrow / 2, 8);
+  const rLo = m.ring(lo, 0), rHi = m.ring(hi, H);
+  m.loft(rLo, rHi, true);
+  m.face(lo, [], 0, false);
+  m.face(hi, [], H, true);
+  return m;
+}
+
+/** { parts, info } in the same shape buildKeycap returns. */
+function buildHolder(p = {}) {
+  const o = { ...HOLDER_DEFAULTS, ...p };
+  const { H, cells } = holderSize(o);
+
+  const cuts = buildPrism(cells.map((cx) => cell(o.cut, cx)), -0.3, o.plateT).weld();
+  const wells = buildPrism(cells.map((cx) => cell(o.well, cx, 0.8)), o.plateT, H + 0.3).weld();
+
+  return {
+    parts: [
+      { name: `Holder ${cells.length}x`, mesh: buildBody(o).weld(), extruder: 1, subtype: 'normal_part' },
+      { name: 'Switch cutouts', mesh: cuts, subtype: 'negative_part' },
+      { name: 'Clip clearance', mesh: wells, subtype: 'negative_part' },
+    ],
+    info: holderInfo(o),
+  };
+}
+
+/**
+ * The numbers worth checking before spending filament.  `warn` entries are the
+ * ones that mean the switch will not go in, or will not stay in.
+ */
+function holderInfo(p = {}) {
+  const o = { ...HOLDER_DEFAULTS, ...p };
+  const { W, D, H, cells } = holderSize(o);
+  const clr = o.cut - MX.cutout;
+  const ledge = (o.well - o.cut) / 2;          // how much plate the clips grab
+  const wall = (o.bodyW - o.well) / 2;         // wall left beside the well
+  const under = o.wellH;                        // free depth below the plate
+  const need = MX.belowPlate + MX.pins;
+  const seat = (o.bodyW - o.cut) / 2;          // plate ledge the housing rests on
+  const gap = cells.length > 1 ? o.pitch - o.well : Infinity;
+
+  const warn = [];
+  if (clr < 0.05) warn.push(`cutout ${o.cut.toFixed(2)} mm chỉ hơn chuẩn ${clr.toFixed(2)} mm — lỗ in ra sẽ co lại và switch không vào được`);
+  if (clr > 0.45) warn.push(`cutout ${o.cut.toFixed(2)} mm rộng hơn chuẩn ${clr.toFixed(2)} mm — ngàm không bám, switch rơi ra`);
+  if (o.plateT < 1.2 || o.plateT > 1.8) warn.push(`tấm dày ${o.plateT.toFixed(2)} mm — ngàm MX cắt cho 1.5 ±0.1 mm, ngoài 1.2–1.8 là không kẹp`);
+  if (ledge < 0.6) warn.push(`gờ cho ngàm bám chỉ ${ledge.toFixed(2)} mm — nới "hốc dưới tấm" rộng ra`);
+  if (wall < 1.2) warn.push(`thành cạnh hốc còn ${wall.toFixed(2)} mm — mỏng, đẩy cap mạnh là nứt`);
+  if (under < need) warn.push(`dưới tấm chỉ trống ${under.toFixed(1)} mm, switch cần ${need.toFixed(1)} mm (vỏ dưới + chân) — đế sẽ chặn switch`);
+  if (seat < 1.2) warn.push(`gờ đỡ vỏ switch còn ${seat.toFixed(2)} mm — vỏ trên 15.6 mm gần như không có chỗ tựa`);
+  if (gap < 1.0) warn.push(`hai hốc kề nhau chỉ cách ${gap.toFixed(2)} mm — giảm "hốc dưới tấm" hoặc tăng pitch`);
+
+  return { W, D, H, n: cells.length, clr, ledge, wall, under, need, seat, gap, warn };
+}
+
+function exportHolder3mf(p = {}, plate = 256) {
+  const { parts } = buildHolder(p);
+  return build3mf({
+    parts,
+    copies: [{ x: plate / 2, y: plate / 2 }],
+    title: 'De giu switch MX',
+    filaments: null,
   });
-  return buildStl(meshes, 'calibration');
 }
 
 const DEFAULT_LOGO=[{"outer":[[5.8,-10],[6.27,-9.974],[6.735,-9.895],[7.187,-9.764],[7.622,-9.584],[8.035,-9.356],[8.419,-9.084],[8.77,-8.77],[9.084,-8.419],[9.356,-8.035],[9.584,-7.622],[9.764,-7.187],[9.895,-6.735],[9.974,-6.27],[10,-5.8],[10,5.8],[9.974,6.27],[9.895,6.735],[9.764,7.187],[9.584,7.622],[9.356,8.035],[9.084,8.419],[8.77,8.77],[8.419,9.084],[8.035,9.356],[7.622,9.584],[7.187,9.764],[6.735,9.895],[6.27,9.974],[5.8,10],[-5.8,10],[-6.27,9.974],[-6.735,9.895],[-7.187,9.764],[-7.622,9.584],[-8.035,9.356],[-8.419,9.084],[-8.77,8.77],[-9.084,8.419],[-9.356,8.035],[-9.584,7.622],[-9.764,7.187],[-9.895,6.735],[-9.974,6.27],[-10,5.8],[-10,-5.8],[-9.974,-6.27],[-9.895,-6.735],[-9.764,-7.187],[-9.584,-7.622],[-9.356,-8.035],[-9.084,-8.419],[-8.77,-8.77],[-8.419,-9.084],[-8.035,-9.356],[-7.622,-9.584],[-7.187,-9.764],[-6.735,-9.895],[-6.27,-9.974],[-5.8,-10]],"holes":[[[-4.4,-7.2],[-4.765,-7.176],[-5.125,-7.105],[-5.472,-6.987],[-5.8,-6.825],[-6.105,-6.621],[-6.38,-6.38],[-6.621,-6.105],[-6.825,-5.8],[-6.987,-5.472],[-7.105,-5.125],[-7.176,-4.765],[-7.2,-4.4],[-7.2,4.4],[-7.176,4.765],[-7.105,5.125],[-6.987,5.472],[-6.825,5.8],[-6.621,6.105],[-6.38,6.38],[-6.105,6.621],[-5.8,6.825],[-5.472,6.987],[-5.125,7.105],[-4.765,7.176],[-4.4,7.2],[4.4,7.2],[4.765,7.176],[5.125,7.105],[5.472,6.987],[5.8,6.825],[6.105,6.621],[6.38,6.38],[6.621,6.105],[6.825,5.8],[6.987,5.472],[7.105,5.125],[7.176,4.765],[7.2,4.4],[7.2,-4.4],[7.176,-4.765],[7.105,-5.125],[6.987,-5.472],[6.825,-5.8],[6.621,-6.105],[6.38,-6.38],[6.105,-6.621],[5.8,-6.825],[5.472,-6.987],[5.125,-7.105],[4.765,-7.176],[4.4,-7.2]]]},{"outer":[[4.8,-1.55],[4.8,1.55],[1.55,1.55],[1.55,4.8],[-1.55,4.8],[-1.55,1.55],[-4.8,1.55],[-4.8,-1.55],[-1.55,-1.55],[-1.55,-4.8],[1.55,-4.8],[1.55,-1.55]],"holes":[]}];
@@ -2179,21 +2318,25 @@ const DEFAULT_LOGO=[{"outer":[[5.8,-10],[6.27,-9.974],[6.735,-9.895],[7.187,-9.7
     toastT = setTimeout(() => t.classList.remove('show'), 3400);
   }
 
-  async function offer(filename, bytes) {
+  // `note` is appended to the success toast rather than toasted separately: two
+  // toasts in a row means the second overwrites the first, and the one that gets
+  // overwritten is always the one that mattered.
+  async function offer(filename, bytes, note = '') {
+    const done = (verb) => toast(verb + ' ' + filename + (note ? ' — ' + note : ''));
     if (!SANDBOXED) {
       const blob = new Blob([bytes], { type: 'application/octet-stream' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob); a.download = filename;
       document.body.appendChild(a); a.click(); a.remove();
       setTimeout(() => URL.revokeObjectURL(a.href), 4000);
-      toast('Đã tải ' + filename);
+      done('Đã tải');
       return;
     }
     const dl = await window.claude.use('downloads');
     if (!dl) { toast('Bản này không tải file được — dùng bản HTML offline.'); return; }
     try {
       await dl.save({ filename, data: new Blob([bytes]) });
-      toast('Đã lưu ' + filename);
+      done('Đã lưu');
     } catch (e) {
       if (e && e.code === 'declined') return;
       if (e && e.code === 'rejected_extension')
@@ -2212,8 +2355,18 @@ const DEFAULT_LOGO=[{"outer":[[5.8,-10],[6.27,-9.974],[6.735,-9.895],[7.187,-9.7
     offer(`${slug()}-${P.capW.toFixed(1)}mm-x${n}.3mf`,
       exportKeycap3mf({ ...P, name: slug() }, logoRings, n, P.plate));
   };
-  $('dlstl').onclick = () =>
-    offer(`${slug()}-${P.capW.toFixed(1)}mm.stl`, exportKeycapStl({ ...P, name: slug() }, logoRings));
+  // An STL is one solid with no negative parts, so the cutout that makes a
+  // recessed or through legend simply is not in the file: what comes out is a
+  // blank cap.  Say so instead of letting it look like an export that worked.
+  $('dlstl').onclick = () => {
+    const lost = logoRings && P.logoMode !== 'raised'
+      ? (P.logoMode === 'through'
+          ? '.stl không mang được phần khoét nên logo xuyên sáng mất hẳn, cap ra đặc. Dùng .3mf.'
+          : '.stl không mang được phần khoét nên logo khắc lõm mất, cap ra trơn. Dùng .3mf.')
+      : '';
+    offer(`${slug()}-${P.capW.toFixed(1)}mm.stl`,
+      exportKeycapStl({ ...P, name: slug() }, logoRings), lost);
+  };
   // ------------------------------------------------- calibration plate
   const calOpts = () => ({
     from: parseFloat($('calFrom').value), to: parseFloat($('calTo').value),
@@ -2241,6 +2394,45 @@ const DEFAULT_LOGO=[{"outer":[[5.8,-10],[6.27,-9.974],[6.735,-9.895],[7.187,-9.7
       exportCalibration3mf(o, P.plate));
   };
 
+  // ---------------------------------------------------- switch holder base
+  const H_KEYS = { hCount: 'count', hPitch: 'pitch', hCut: 'cut', hPlateT: 'plateT',
+                   hWell: 'well', hWellH: 'wellH', hBodyW: 'bodyW' };
+  const holderOpts = () => {
+    const o = {};
+    for (const [id, key] of Object.entries(H_KEYS)) {
+      const v = parseFloat($(id).value);
+      if (isFinite(v)) o[key] = v;
+    }
+    return o;
+  };
+  function drawHolder() {
+    const i = holderInfo(holderOpts());
+    $('hInfo').textContent =
+      `${i.n} switch · đế ${i.W.toFixed(1)} × ${i.D.toFixed(1)} × ${i.H.toFixed(1)} mm · ` +
+      `dư so với lỗ chuẩn +${i.clr.toFixed(2)} mm · gờ cho ngàm ${i.ledge.toFixed(2)} mm · ` +
+      `trống dưới tấm ${i.under.toFixed(1)}/${i.need.toFixed(1)} mm`;
+    $('hMsgs').innerHTML = i.warn.length
+      ? i.warn.map((s) => `<li>${s}</li>`).join('')
+      : '<li class="good">Đúng chuẩn MX plate-mount — switch sẽ ấn vào và kẹp được.</li>';
+  }
+  for (const id of Object.keys(H_KEYS)) $(id).addEventListener('input', drawHolder);
+  // A warning here means the switch will not go in or will not stay in, which is
+  // a wasted print — so it takes a second click.  Two clicks, not a modal dialog:
+  // a confirm() blocks the whole page and some embeddings refuse it outright.
+  let holderArmed = false;
+  $('dlholder').onclick = () => {
+    const o = holderOpts();
+    const i = holderInfo(o);
+    if (i.warn.length && !holderArmed) {
+      holderArmed = true;
+      setTimeout(() => { holderArmed = false; }, 6000);
+      toast('Đế đang có cảnh báo ở trên — bấm lần nữa nếu vẫn muốn xuất');
+      return;
+    }
+    holderArmed = false;
+    offer(`de-switch-mx-${i.n}x.3mf`, exportHolder3mf(o, P.plate));
+  };
+
   $('dljson').onclick = () => {
     const cfg = { app: 'xuong-keycap-mx', v: 1, params: P, logo: logoName || null,
                   logoRings: logoRings || null };
@@ -2248,7 +2440,8 @@ const DEFAULT_LOGO=[{"outer":[[5.8,-10],[6.27,-9.974],[6.735,-9.895],[7.187,-9.7
   };
 
   if (SANDBOXED) {
-    $('dl3mf').disabled = true; $('dlstl').disabled = true; $('dlcal').disabled = true;
+    $('dl3mf').disabled = true; $('dlstl').disabled = true;
+    $('dlcal').disabled = true; $('dlholder').disabled = true;
     $('dlNote').innerHTML = 'Trang đã publish chỉ được lưu các định dạng trong danh sách cho phép, <b>không có .3mf/.stl</b>. ' +
       'Chỉnh xong ở đây rồi bấm <b>Lưu thông số .json</b>, mở file HTML offline và nạp lại — hoặc xuất trực tiếp trong bản offline.';
     const load = document.createElement('label');
@@ -2281,6 +2474,7 @@ const DEFAULT_LOGO=[{"outer":[[5.8,-10],[6.27,-9.974],[6.735,-9.895],[7.187,-9.7
   $('fileName').textContent = logoName;
   syncInputs();
   drawCalInfo();
+  drawHolder();
   rebuild();
 })();
 

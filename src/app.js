@@ -668,21 +668,25 @@
     toastT = setTimeout(() => t.classList.remove('show'), 3400);
   }
 
-  async function offer(filename, bytes) {
+  // `note` is appended to the success toast rather than toasted separately: two
+  // toasts in a row means the second overwrites the first, and the one that gets
+  // overwritten is always the one that mattered.
+  async function offer(filename, bytes, note = '') {
+    const done = (verb) => toast(verb + ' ' + filename + (note ? ' — ' + note : ''));
     if (!SANDBOXED) {
       const blob = new Blob([bytes], { type: 'application/octet-stream' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob); a.download = filename;
       document.body.appendChild(a); a.click(); a.remove();
       setTimeout(() => URL.revokeObjectURL(a.href), 4000);
-      toast('Đã tải ' + filename);
+      done('Đã tải');
       return;
     }
     const dl = await window.claude.use('downloads');
     if (!dl) { toast('Bản này không tải file được — dùng bản HTML offline.'); return; }
     try {
       await dl.save({ filename, data: new Blob([bytes]) });
-      toast('Đã lưu ' + filename);
+      done('Đã lưu');
     } catch (e) {
       if (e && e.code === 'declined') return;
       if (e && e.code === 'rejected_extension')
@@ -701,8 +705,18 @@
     offer(`${slug()}-${P.capW.toFixed(1)}mm-x${n}.3mf`,
       exportKeycap3mf({ ...P, name: slug() }, logoRings, n, P.plate));
   };
-  $('dlstl').onclick = () =>
-    offer(`${slug()}-${P.capW.toFixed(1)}mm.stl`, exportKeycapStl({ ...P, name: slug() }, logoRings));
+  // An STL is one solid with no negative parts, so the cutout that makes a
+  // recessed or through legend simply is not in the file: what comes out is a
+  // blank cap.  Say so instead of letting it look like an export that worked.
+  $('dlstl').onclick = () => {
+    const lost = logoRings && P.logoMode !== 'raised'
+      ? (P.logoMode === 'through'
+          ? '.stl không mang được phần khoét nên logo xuyên sáng mất hẳn, cap ra đặc. Dùng .3mf.'
+          : '.stl không mang được phần khoét nên logo khắc lõm mất, cap ra trơn. Dùng .3mf.')
+      : '';
+    offer(`${slug()}-${P.capW.toFixed(1)}mm.stl`,
+      exportKeycapStl({ ...P, name: slug() }, logoRings), lost);
+  };
   // ------------------------------------------------- calibration plate
   const calOpts = () => ({
     from: parseFloat($('calFrom').value), to: parseFloat($('calTo').value),
@@ -730,6 +744,45 @@
       exportCalibration3mf(o, P.plate));
   };
 
+  // ---------------------------------------------------- switch holder base
+  const H_KEYS = { hCount: 'count', hPitch: 'pitch', hCut: 'cut', hPlateT: 'plateT',
+                   hWell: 'well', hWellH: 'wellH', hBodyW: 'bodyW' };
+  const holderOpts = () => {
+    const o = {};
+    for (const [id, key] of Object.entries(H_KEYS)) {
+      const v = parseFloat($(id).value);
+      if (isFinite(v)) o[key] = v;
+    }
+    return o;
+  };
+  function drawHolder() {
+    const i = holderInfo(holderOpts());
+    $('hInfo').textContent =
+      `${i.n} switch · đế ${i.W.toFixed(1)} × ${i.D.toFixed(1)} × ${i.H.toFixed(1)} mm · ` +
+      `dư so với lỗ chuẩn +${i.clr.toFixed(2)} mm · gờ cho ngàm ${i.ledge.toFixed(2)} mm · ` +
+      `trống dưới tấm ${i.under.toFixed(1)}/${i.need.toFixed(1)} mm`;
+    $('hMsgs').innerHTML = i.warn.length
+      ? i.warn.map((s) => `<li>${s}</li>`).join('')
+      : '<li class="good">Đúng chuẩn MX plate-mount — switch sẽ ấn vào và kẹp được.</li>';
+  }
+  for (const id of Object.keys(H_KEYS)) $(id).addEventListener('input', drawHolder);
+  // A warning here means the switch will not go in or will not stay in, which is
+  // a wasted print — so it takes a second click.  Two clicks, not a modal dialog:
+  // a confirm() blocks the whole page and some embeddings refuse it outright.
+  let holderArmed = false;
+  $('dlholder').onclick = () => {
+    const o = holderOpts();
+    const i = holderInfo(o);
+    if (i.warn.length && !holderArmed) {
+      holderArmed = true;
+      setTimeout(() => { holderArmed = false; }, 6000);
+      toast('Đế đang có cảnh báo ở trên — bấm lần nữa nếu vẫn muốn xuất');
+      return;
+    }
+    holderArmed = false;
+    offer(`de-switch-mx-${i.n}x.3mf`, exportHolder3mf(o, P.plate));
+  };
+
   $('dljson').onclick = () => {
     const cfg = { app: 'xuong-keycap-mx', v: 1, params: P, logo: logoName || null,
                   logoRings: logoRings || null };
@@ -737,7 +790,8 @@
   };
 
   if (SANDBOXED) {
-    $('dl3mf').disabled = true; $('dlstl').disabled = true; $('dlcal').disabled = true;
+    $('dl3mf').disabled = true; $('dlstl').disabled = true;
+    $('dlcal').disabled = true; $('dlholder').disabled = true;
     $('dlNote').innerHTML = 'Trang đã publish chỉ được lưu các định dạng trong danh sách cho phép, <b>không có .3mf/.stl</b>. ' +
       'Chỉnh xong ở đây rồi bấm <b>Lưu thông số .json</b>, mở file HTML offline và nạp lại — hoặc xuất trực tiếp trong bản offline.';
     const load = document.createElement('label');
@@ -770,5 +824,6 @@
   $('fileName').textContent = logoName;
   syncInputs();
   drawCalInfo();
+  drawHolder();
   rebuild();
 })();

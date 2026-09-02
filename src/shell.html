@@ -298,6 +298,26 @@ table.spec td.n{text-align:right;white-space:nowrap}
           chỉ khác nhau bề rộng khe. Số dập là đơn vị phần trăm mm: <b>425</b> nghĩa là khe 4.25 mm.
           In một màu, <b>không bật support</b>.</p>
       </fieldset>
+
+      <fieldset>
+        <legend>Đế giữ switch</legend>
+        <p class="note" style="margin-top:0">Đế để nhét switch thật vào mà thử khay hiệu chuẩn và thử cap in xong.
+          Chuẩn MX plate-mount giống nhau ở mọi hãng: lỗ vuông <b>14.0 mm</b>, tấm dày <b>1.5 ±0.1 mm</b>,
+          ngàm bung ra bám dưới tấm.</p>
+        <div class="row"><label for="hCount">Số switch</label><input id="hCount" type="number" step="1" min="1" max="12" value="1"><span class="u">cái</span></div>
+        <div class="row"><label for="hPitch">Pitch</label><input id="hPitch" type="number" step="0.01" value="19.05"><span class="u">mm</span></div>
+        <div class="row"><label for="hCut">Lỗ vuông</label><input id="hCut" type="number" step="0.05" value="14.15"><span class="u">mm</span></div>
+        <div class="row"><label for="hPlateT">Dày tấm</label><input id="hPlateT" type="number" step="0.05" value="1.5"><span class="u">mm</span></div>
+        <div class="row"><label for="hWell">Hốc dưới tấm</label><input id="hWell" type="number" step="0.1" value="16.4"><span class="u">mm</span></div>
+        <div class="row"><label for="hWellH">Sâu hốc</label><input id="hWellH" type="number" step="0.5" value="9"><span class="u">mm</span></div>
+        <div class="row"><label for="hBodyW">Bề đế</label><input id="hBodyW" type="number" step="0.5" value="21"><span class="u">mm</span></div>
+        <p class="note" id="hInfo"></p>
+        <ul class="msgs" id="hMsgs" style="margin-top:9px"></ul>
+        <button class="btn ghost" id="dlholder" type="button">Tải đế giữ switch .3mf</button>
+        <p class="note">Lỗ để <b>14.15</b> chứ không phải 14.00: lỗ in FDM luôn co lại, đúng 14.00 là switch không vào.
+          In một màu, <b>không support</b> — đế đã dựng úp mặt lỗ xuống bàn nên không có chỗ nào cần đỡ.
+          In xong lật ngược lại, mặt tấm ở trên, ấn switch xuống tới khi nghe tách.</p>
+      </fieldset>
     </div>
 
     <div class="stage">

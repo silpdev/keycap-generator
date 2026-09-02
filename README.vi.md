@@ -29,6 +29,8 @@ hỏi thẳng số đo rồi kiểm tra lại:
   thư viện đọc outline font, không thêm phụ thuộc nào.
 - **Khay hiệu chuẩn khe chân.** Một khay gồm nhiều mẩu thử, khe tăng dần theo bước,
   mỗi mẩu dập sẵn số của chính nó. In một lần, giữ lấy con số.
+- **Đế giữ switch.** Đế để ấn switch MX thật vào, có chỗ mà thử mấy mẩu hiệu chuẩn
+  và thử cap in xong.
 - **3MF hai màu.** Thân cap và logo thành hai part riêng có filament riêng, và file
   khai báo sẵn hai slot filament để phần gán màu không bị mất khi import.
 
@@ -57,7 +59,8 @@ giới giữa một cap bấm vào kêu tách và một cap nứt chân hoặc t
 
 1. Đặt bề cánh, độ sâu khe, đường kính ống và vát dẫn hướng đúng như bạn sẽ dùng.
 2. Xuất khay hiệu chuẩn — mặc định 7 mẩu từ 4.05 đến 4.35 mm.
-3. In một màu, **tắt support**, khoảng 20 phút.
+3. In một màu, **tắt support**, khoảng 20 phút. Nếu không có switch nào đang gắn
+   sẵn ở đâu thì in kèm luôn cái đế giữ switch.
 4. Thử từng mẩu vào switch thật. Mẩu nào vào chắc tay mà rút ra không phải giằng là
    mẩu thắng.
 5. Đọc số dập trên mẩu đó, nhập vào ô **Khe: ngang chữ thập**.
@@ -68,6 +71,26 @@ Số dập theo đơn vị phần trăm mm — `425` là khe 4.25 mm — và đ�
 xuống bàn in, mặt sắc nét nhất máy in làm được. Mỗi mẩu dựng từ đúng `buildCapShell`
 và `buildStem` của cap thật, nên khay đo cái gì thì cap ra đúng cái đó; bộ test còn đo
 lại bề rộng khe từ mesh đã dựng để chắc mẩu đúng bằng con số dập trên nó.
+
+## Đế giữ switch
+
+Chuẩn plate-mount của Cherry giống nhau ở mọi MX và mọi hàng clone: lỗ vuông
+**14 × 14 mm** trên tấm dày **1.5 ±0.1 mm**, hai cái ngàm ở vỏ dưới bung ra bám vào
+mặt dưới tấm. Từ mặt trên tấm xuống mặt PCB là 5 mm, nên vỏ dưới thò xuống dưới tấm
+khoảng 3.5 mm và chân kim loại của switch plate-mount thêm chừng 3 mm nữa — tất cả
+chỗ đó phải trống.
+
+Hai chỗ tool xử lý theo số đó. Lỗ để mặc định **14.15 mm** chứ không phải 14.00: lỗ
+in FDM luôn ra nhỏ hơn, đúng 14.00 là switch không vào nổi. Và đế được dựng úp mặt
+tấm xuống, nên lỗ nằm ở lớp đầu tiên, hốc mở lên phía đầu phun, và vỏ ngoài **loe ra**
+khi lên cao — hướng tự đỡ được. Kết quả: chân đế rộng cho vững, không chỗ nào cần đỡ,
+không có support nào phải móc ra khỏi hốc. In xong lật ngược lại là mặt tấm ở trên,
+đúng chỗ nhét switch.
+
+Phần kiểm tra cũng cùng một ý với cap: nó báo khi lỗ chật quá không nhét được switch
+hoặc rộng quá không giữ được, khi tấm ra ngoài khoảng 1.2–1.8 mm mà ngàm cắt cho, khi
+hốc dưới tấm cạn hơn phần vỏ dưới cộng chân, và — khi làm nhiều ô — khi hai hốc kề
+nhau sắp ăn thông vào nhau.
 
 ## Ba chỗ dễ sai mà nó làm đúng
 
@@ -111,6 +134,10 @@ npm test      # không cần cài gì — core và test chỉ dùng builtin củ
   buộc khớp với số dập trên mẩu tới 1e-6 mm, kiểm các thanh chữ số 7 đoạn không được
   dính nhau (dính là hàn thành cạnh không manifold), và soi từng part như
   `test_export.mjs`.
+- **`test_holder.mjs`** — đế giữ switch. Đo lại lỗ, dày tấm và độ trống dưới tấm từ
+  mesh rồi kiểm switch thật có nhét vô được không, xác nhận vỏ ngoài không bao giờ
+  thu vào khi lên cao (loe sai chiều là phải support khắp), và đẩy sáu cấu hình cố
+  ý sai qua phần kiểm tra để chắc mỗi lỗi đều bị bắt.
 - **`test_mesh.mjs`** — ghi từng part ra `out/*.stl` rồi in kích thước.
 
 ## Phát triển
@@ -132,6 +159,7 @@ CI chạy test rồi báo lỗi nếu `docs/index.html` không khớp với `src
 | `src/export3mf.mjs` | Zip writer (STORE + CRC32), 3MF kiểu Bambu, STL nhị phân |
 | `src/build.mjs` | Preset, ghép part, hướng in, xếp cap trên khay |
 | `src/calibration.mjs` | Chữ số 7 đoạn và khay hiệu chuẩn khe chân |
+| `src/holder.mjs` | Đế MX plate-mount, kèm phần kiểm tra độ vừa riêng |
 | `src/app.js` | UI: preview WebGL, bản vẽ mặt cắt, bảng kiểm tra dung sai |
 | `src/shell.html` | Markup và CSS, dùng chung cho bản dev và bản bundle |
 | `bundle.mjs` | Nhồi tất cả vào `docs/index.html` |
@@ -152,6 +180,11 @@ máy bạn đang chọn không bị đổi. Bambu hỏi có nạp cấu hình c�
 
 Hai màu vẫn cần project có hai filament. Không có AMS hay slot thứ hai thì không file
 nào làm ra được.
+
+Nút `.stl` chỉ để in cap một màu. STL không có khái niệm part trừ, nên logo khắc lõm
+hay xuyên sáng đơn giản là không nằm trong file — bạn nhận được một cái cap trơn. Tool
+nói rõ điều đó lúc bạn bấm. Khay hiệu chuẩn thì không có STL luôn, cùng lý do: bảy mẩu
+giống nhau mà không có số thì tệ hơn là không có khay, vì không biết mẩu nào vừa.
 
 ## Ghi công
 

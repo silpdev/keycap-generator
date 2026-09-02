@@ -11,8 +11,8 @@
 // generator uses for a real cap, so what the strip measures is what the cap
 // will do — no separate test geometry to drift out of sync.
 // ---------------------------------------------------------------------------
-import { buildCapShell, buildStem, buildPrism, Mesh } from './geom.mjs';
-import { build3mf, buildStl } from './export3mf.mjs';
+import { buildCapShell, buildStem, buildPrism } from './geom.mjs';
+import { build3mf } from './export3mf.mjs';
 
 // ------------------------------------------------------- seven-segment digits
 // A bundled font would be the obvious way to letter these, and the wrong one:
@@ -173,22 +173,7 @@ export function exportCalibration3mf(o = {}, plate = 256) {
                     filaments: null });
 }
 
-export function exportCalibrationStl(o = {}) {
-  const p = { ...CAL_DEFAULTS, ...o };
-  const spans = calSpans(p);
-  const meshes = [];
-  const pitch = p.pieceW + 3;
-  spans.forEach((span, i) => {
-    const piece = buildCalPiece(span, p);
-    const dx = (i - (spans.length - 1) / 2) * pitch;
-    for (const q of piece.parts) {
-      if (q.subtype !== 'normal_part') continue;
-      const m = q.mesh.flipped(piece.capH);
-      const t = new Mesh();
-      t.V = m.V.map((v) => [v[0] + dx, v[1], v[2]]);
-      t.F = m.F.map((f) => f.slice());
-      meshes.push(t);
-    }
-  });
-  return buildStl(meshes, 'calibration');
-}
+// There is deliberately no STL export here.  STL has no concept of a negative
+// part, so the only thing an STL writer could do is drop the engraved numbers —
+// and seven identical unlabelled pieces are worse than no plate at all, because
+// you cannot tell which one fitted.  3MF or nothing.
