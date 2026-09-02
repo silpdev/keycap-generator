@@ -90,6 +90,20 @@ không có support nào phải móc ra khỏi hốc. In xong lật ngược lạ
 
 ![Đế nhìn từ mặt tấm: 21 mm vuông, lỗ 14.15 mm và tai móc khoá](docs/holder.png)
 
+Đầu kia của hốc được **đáy** bịt lại. Bản đầu tôi để hở — hốc khoét thông suốt — nên
+đế thành cái ống: nhìn mặt nào cũng thấy switch với mấy cái chân kim loại, mà đeo chìa
+khoá thì chân nó vướng vào đủ thứ. Đáy là chỗ **duy nhất** slicer phải bắc cầu, một
+nhịp phủ qua hốc gối lên cả bốn thành, và cũng là mặt duy nhất trong cả part không có
+gì đỡ (soi overhang trên kết quả boolean: 268 mm² mặt ngang hướng xuống ở chỗ đáy, còn
+lại không có gì ở bất kỳ góc nào). **Đừng bật support** — tới lớp đó hốc đã kín, support
+chui vào là không bao giờ lấy ra được. Đặt dày đáy = 0 thì quay lại kiểu hở, vẫn đúng
+cho đế thử trên bàn khi cần chọc dây vào chân switch; còn đáy kín thì không có cách lấy
+switch ra, nên muốn lấy được thì đặt **lỗ đẩy** 5–6 mm để thông que vào đẩy nó ra.
+
+Thành đế để thẳng. Bè chân ra thì đứng vững hơn trên bàn nhưng đeo chìa khoá trông như
+cái chặn cửa, mà nó chưa bao giờ là điều kiện để in được — thành thẳng đứng tự đỡ y như
+thành loe ra. Muốn bè lại thì có ô `Bè chân đế`.
+
 Tai móc khoá là một cái tai nhô ra ở mức mặt tấm, không phải lỗ khoan xuyên tấm:
 giữa lỗ switch và rìa đế chỉ còn 3.4 mm, mà 1.5 mm PLA có lỗ 3 mm ở giữa thì là cái
 bản lề chứ không phải tai. Nên tai dày 3 mm — gấp đôi tấm — ăn 2 mm vào thân đế, và
@@ -103,8 +117,9 @@ hoặc rộng quá không giữ được, khi tấm ra ngoài khoảng 1.2–1.8
 hốc dưới tấm cạn hơn phần vỏ dưới cộng chân, và — khi làm nhiều ô — khi hai hốc kề
 nhau sắp ăn thông vào nhau. Tai móc khoá có phần kiểm riêng: thiếu nhựa hai bên hoặc
 phía sau lỗ, tai mỏng dưới 2 mm, lỗ nhỏ quá không lồng khoen được, hoặc tai ngắn quá
-làm lỗ ăn vào thành đế (thành đế loe ra khi lên cao, nên nó đo ở đỉnh tai — chỗ sát
-nhất).
+làm lỗ ăn vào thành đế (khi bật bè chân thì thành loe ra theo độ cao, nên nó đo ở đỉnh
+tai — chỗ sát nhất). Đáy cũng có phần kiểm riêng: mỏng dưới 0.8 mm thì lớp bắc cầu
+không kín, mặt sau in ra rỗ.
 
 ## Ba chỗ dễ sai mà nó làm đúng
 
@@ -151,8 +166,9 @@ npm test      # không cần cài gì — core và test chỉ dùng builtin củ
 - **`test_holder.mjs`** — đế giữ switch. Đo lại lỗ, dày tấm và độ trống dưới tấm từ
   mesh rồi kiểm switch thật có nhét vô được không, xác nhận vỏ ngoài không bao giờ
   thu vào khi lên cao (loe sai chiều là phải support khắp), đo lỗ móc khoá từ mesh rồi kiểm nhựa
-  cả ba phía cùng khoảng cách tới hốc ngàm, và đẩy mười một cấu hình cố ý sai qua
-  phần kiểm tra để chắc mỗi lỗi đều bị bắt.
+  cả ba phía cùng khoảng cách tới hốc ngàm, xác nhận đáy thật sự bịt kín mặt
+  sau (và đặt về 0 thì thật sự hở lại), và đẩy mười ba cấu hình cố ý sai qua phần
+  kiểm tra để chắc mỗi lỗi đều bị bắt.
 - **`test_mesh.mjs`** — ghi từng part ra `out/*.stl` rồi in kích thước.
 
 ## Phát triển

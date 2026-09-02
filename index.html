@@ -316,8 +316,11 @@ table.spec td.n{text-align:right;white-space:nowrap}
         <div class="row"><label for="hCut">Lỗ vuông</label><input id="hCut" type="number" step="0.05" value="14.15"><span class="u">mm</span></div>
         <div class="row"><label for="hPlateT">Dày tấm</label><input id="hPlateT" type="number" step="0.05" value="1.5"><span class="u">mm</span></div>
         <div class="row"><label for="hWell">Hốc dưới tấm</label><input id="hWell" type="number" step="0.1" value="16.4"><span class="u">mm</span></div>
-        <div class="row"><label for="hWellH">Sâu hốc</label><input id="hWellH" type="number" step="0.5" value="9"><span class="u">mm</span></div>
+        <div class="row"><label for="hWellH">Sâu hốc</label><input id="hWellH" type="number" step="0.5" value="7.5"><span class="u">mm</span></div>
+        <div class="row"><label for="hFloor">Dày đáy</label><input id="hFloor" type="number" step="0.2" value="1.2"><span class="u">mm</span></div>
+        <div class="row"><label for="hFloorHole">Lỗ đẩy ⌀</label><input id="hFloorHole" type="number" step="0.5" value="0"><span class="u">mm</span></div>
         <div class="row"><label for="hBodyW">Bề đế</label><input id="hBodyW" type="number" step="0.5" value="21"><span class="u">mm</span></div>
+        <div class="row"><label for="hFootGrow">Bè chân đế</label><input id="hFootGrow" type="number" step="0.5" value="0"><span class="u">mm</span></div>
         <label class="check"><input id="hLoop" type="checkbox" checked> Có tai móc khoá</label>
         <div class="row"><label for="hLoopHole">Lỗ móc ⌀</label><input id="hLoopHole" type="number" step="0.1" value="3.2"><span class="u">mm</span></div>
         <div class="row"><label for="hLoopOut">Tai nhô ra</label><input id="hLoopOut" type="number" step="0.5" value="7"><span class="u">mm</span></div>
@@ -327,8 +330,14 @@ table.spec td.n{text-align:right;white-space:nowrap}
         <ul class="msgs" id="hMsgs" style="margin-top:9px"></ul>
         <button class="btn ghost" id="dlholder" type="button">Tải đế giữ switch .3mf</button>
         <p class="note">Lỗ để <b>14.15</b> chứ không phải 14.00: lỗ in FDM luôn co lại, đúng 14.00 là switch không vào.
-          In một màu, <b>không support</b> — đế đã dựng úp mặt lỗ xuống bàn nên không có chỗ nào cần đỡ.
           In xong lật ngược lại, mặt tấm ở trên, ấn switch xuống tới khi nghe tách.</p>
+        <p class="note"><b>Đừng bật support.</b> Đế dựng úp mặt lỗ xuống bàn nên cả part chỉ có
+          <b>một chỗ</b> cần bắc cầu: lớp đáy phủ qua hốc, gối lên cả bốn thành nên slicer bắc cầu được,
+          không cần đỡ. Mà hốc lúc đó đã kín — support chui vào là không lấy ra được nữa.
+          Lớp đáy hơi xấu ở mặt trong hốc là bình thường, không ai thấy.</p>
+        <p class="note"><b>Dày đáy = 0</b> thì mặt sau hở, nhìn thấy chân switch — chỉ nên dùng khi làm
+          đế thử trên bàn và cần chọc dây vào chân. Đáy kín thì khó lấy switch ra; muốn lấy được thì
+          đặt <b>lỗ đẩy</b> khoảng 5–6 mm để thông một cây que vào đẩy switch ra.</p>
       </fieldset>
     </div>
 

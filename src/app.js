@@ -747,6 +747,7 @@
   // ---------------------------------------------------- switch holder base
   const H_KEYS = { hCount: 'count', hPitch: 'pitch', hCut: 'cut', hPlateT: 'plateT',
                    hWell: 'well', hWellH: 'wellH', hBodyW: 'bodyW',
+                   hFloor: 'floor', hFloorHole: 'floorHole', hFootGrow: 'footGrow',
                    hLoopHole: 'loopHole', hLoopOut: 'loopOut', hLoopW: 'loopW', hLoopT: 'loopT' };
   const holderOpts = () => {
     const o = { loop: $('hLoop').checked };
@@ -761,10 +762,13 @@
     $('hInfo').textContent =
       `${i.n} switch · đế ${i.W.toFixed(1)} × ${i.D.toFixed(1)} × ${i.H.toFixed(1)} mm · ` +
       `dư so với lỗ chuẩn +${i.clr.toFixed(2)} mm · gờ cho ngàm ${i.ledge.toFixed(2)} mm · ` +
-      `trống dưới tấm ${i.under.toFixed(1)}/${i.need.toFixed(1)} mm` +
+      `hốc sâu ${i.under.toFixed(1)}/${i.need.toFixed(1)} mm · ` +
+      (i.floor > 0 ? `đáy kín ${i.floor.toFixed(1)} mm` : 'mặt sau HỞ') +
+      (i.floorHole > 0 ? ` (lỗ đẩy ⌀${i.floorHole.toFixed(1)})` : '') +
       (i.loop ? ` · tai ⌀${i.loop.hole.toFixed(1)} mm, hai bên còn ${i.loop.side.toFixed(1)} mm` : '');
     for (const id of ['hLoopHole', 'hLoopOut', 'hLoopW', 'hLoopT'])
       $(id).disabled = !$('hLoop').checked;
+    $('hFloorHole').disabled = !(i.floor > 0);
     $('hMsgs').innerHTML = i.warn.length
       ? i.warn.map((s) => `<li>${s}</li>`).join('')
       : '<li class="good">Đúng chuẩn MX plate-mount — switch sẽ ấn vào và kẹp được.</li>';

@@ -8,12 +8,17 @@
 // of a plate-mount switch add roughly 3 mm more.  Everything below the plate
 // therefore needs to be empty.
 //
-// Printing decides the shape.  Modelled plate-down, the cutout lands in the
-// first layer, the clearance well opens towards the nozzle, and the outer wall
-// leans *outward* as it rises — which is the self-supporting direction — so the
-// finished part has a wide, stable foot with no overhang anywhere and no
-// support to dig out of the well.  Turn it over after printing and the plate is
-// on top where the switch goes in.
+// Printing decides the orientation.  Modelled plate-down, the cutout lands in
+// the first layer, the clip well opens towards the nozzle, and the walls are
+// vertical — so nothing overhangs and there is no support to dig out of the
+// well.  Turn it over after printing and the plate is on top where the switch
+// goes in.
+//
+// The far end of the well is closed by a floor, which the slicer prints as one
+// bridge across the cavity.  Leaving it open — as the first version did — makes
+// the base a tube: the switch and its pins show through both faces, and on a
+// keyring the pins catch on everything.  The floor costs one bridged layer and
+// no support; support inside a sealed cavity is unremovable, so don't enable it.
 // ---------------------------------------------------------------------------
 import { roundedRect, buildPrism, Mesh } from './geom.mjs';
 import { build3mf } from './export3mf.mjs';
@@ -34,9 +39,21 @@ export const HOLDER_DEFAULTS = {
   cut: 14.15,
   plateT: 1.5,
   well: 16.4,          // clearance under the plate — the clips spring outward
-  wellH: 9.0,          // deep enough for housing + pins with room to spare
+  wellH: 7.5,          // deep enough for housing + pins with a little room
+  // The back has to be closed.  Left open, the well cuts clean through and the
+  // base is a tube: you see the switch and its pins from both faces, the pins
+  // catch on things in a pocket, and it reads as unfinished.  0 = open frame,
+  // which is still the right thing for a bench tester you want to poke wires into.
+  floor: 1.2,
+  // Optional hole through that floor.  A sealed box has no way to get the switch
+  // out again — the clips are unreachable — so this leaves a way to push it out
+  // with a rod.  Off by default: it puts the pins back within reach.
+  floorHole: 0,
   bodyW: 21.0,         // plate footprint per cell
-  footGrow: 7.0,       // how much wider the foot is than the plate, total
+  // Straight sides by default.  A flared foot is steadier on a bench and looks
+  // like a doorstop on a keyring; either way it is not a printing requirement —
+  // a vertical wall is just as self-supporting as one leaning outward.
+  footGrow: 0,         // how much wider the foot is than the plate, total
   cornerR: 2.0,
   // Keyring lug.  It has to be a tab sticking out, not a hole through the plate:
   // between the switch cutout and the rim there are only (bodyW - cut)/2 ≈ 3.4 mm
@@ -64,20 +81,22 @@ export function holderSize(p = {}) {
   const o = { ...HOLDER_DEFAULTS, ...p };
   const c = cellCentres(o);
   const span = c.length > 1 ? c[c.length - 1] - c[0] : 0;
-  return { W: span + o.bodyW, D: o.bodyW, H: o.plateT + o.wellH, cells: c };
+  return { W: span + o.bodyW, D: o.bodyW,
+           H: o.plateT + o.wellH + Math.max(0, o.floor), cells: c };
 }
 
 /**
- * The solid body: plate footprint at z=0 growing to the foot at the top of the
- * print.  Leaning outward at ~25° from vertical, so every layer is supported by
- * the one below it.
+ * The solid body: plate footprint at z=0, optionally widening towards the foot at
+ * the top of the print.  It must never get *narrower* as z rises — that is the
+ * direction that needs support — so footGrow is clamped at 0.
  */
 function buildBody(p) {
   const o = { ...HOLDER_DEFAULTS, ...p };
   const { W, D, H } = holderSize(o);
+  const grow = Math.max(0, o.footGrow);
   const m = new Mesh();
   const lo = roundedRect(W, D, o.cornerR, 8);
-  const hi = roundedRect(W + o.footGrow, D + o.footGrow, o.cornerR + o.footGrow / 2, 8);
+  const hi = roundedRect(W + grow, D + grow, o.cornerR + grow / 2, 8);
   const rLo = m.ring(lo, 0), rHi = m.ring(hi, H);
   m.loft(rLo, rHi, true);
   m.face(lo, [], 0, false);
@@ -112,14 +131,24 @@ export function buildHolder(p = {}) {
   const o = { ...HOLDER_DEFAULTS, ...p };
   const { H, cells } = holderSize(o);
 
+  const floor = Math.max(0, o.floor);
   const cuts = buildPrism(cells.map((cx) => cell(o.cut, cx)), -0.3, o.plateT).weld();
-  const wells = buildPrism(cells.map((cx) => cell(o.well, cx, 0.8)), o.plateT, H + 0.3).weld();
+  // With a floor the well stops short of the top face; without one it runs past it
+  // so the back stays open.
+  const wells = buildPrism(cells.map((cx) => cell(o.well, cx, 0.8)),
+    o.plateT, floor > 0 ? o.plateT + o.wellH : H + 0.3).weld();
 
   const parts = [
     { name: `Holder ${cells.length}x`, mesh: buildBody(o).weld(), extruder: 1, subtype: 'normal_part' },
     { name: 'Switch cutouts', mesh: cuts, subtype: 'negative_part' },
     { name: 'Clip clearance', mesh: wells, subtype: 'negative_part' },
   ];
+
+  if (floor > 0 && o.floorHole > 0) {
+    const holes = buildPrism(cells.map((cx) => circle(o.floorHole, cx, 40)),
+      o.plateT + o.wellH - 0.3, H + 0.3).weld();
+    parts.push({ name: 'Push-out holes', mesh: holes, subtype: 'negative_part' });
+  }
 
   if (o.loop) {
     const g = loopGeom(o);
@@ -161,16 +190,22 @@ export function holderInfo(p = {}) {
   if (seat < 1.2) warn.push(`gờ đỡ vỏ switch còn ${seat.toFixed(2)} mm — vỏ trên 15.6 mm gần như không có chỗ tựa`);
   if (gap < 1.0) warn.push(`hai hốc kề nhau chỉ cách ${gap.toFixed(2)} mm — giảm "hốc dưới tấm" hoặc tăng pitch`);
 
+  const floor = Math.max(0, o.floor);
+  if (floor > 0 && floor < 0.8)
+    warn.push(`đáy dày ${floor.toFixed(2)} mm — dưới 0.8 mm thì lớp bắc cầu qua hốc không kín, đáy sẽ rỗ`);
+  if (floor > 0 && o.floorHole > 0 && o.floorHole > o.well - 3)
+    warn.push(`lỗ đẩy ⌀${o.floorHole.toFixed(1)} mm gần bằng cả hốc — đáy gần như không còn gì`);
+
   let loop = null;
   if (o.loop) {
     const g = loopGeom(o);
     const side = (o.loopW - o.loopHole) / 2;     // material each side of the hole
     // The body flares as it rises, so the wall is closest to the hole at the top
     // of the tab, not at the plate — measure it there.
-    const wallAt = (W + o.footGrow * (o.loopT / H)) / 2;
+    const wallAt = (W + Math.max(0, o.footGrow) * (o.loopT / H)) / 2;
     const clear = g.hole - o.loopHole / 2 - wallAt;
     loop = { out: o.loopOut, w: o.loopW, t: o.loopT, hole: o.loopHole,
-             side, edge: o.loopEdge, reach: g.x1 - W / 2 };
+             side, edge: o.loopEdge, reach: g.x1 - W / 2, clear };
     if (side < 1.6) warn.push(`hai bên lỗ móc chỉ còn ${side.toFixed(2)} mm — nới "bề tai" hoặc giảm đường kính lỗ`);
     if (o.loopEdge < 1.2) warn.push(`đầu tai sau lỗ chỉ còn ${o.loopEdge.toFixed(2)} mm — tai sẽ đứt ở đó`);
     if (o.loopT < 2.0) warn.push(`tai dày ${o.loopT.toFixed(1)} mm — dưới 2 mm là bẻ mấy lần sẽ gãy`);
@@ -178,7 +213,8 @@ export function holderInfo(p = {}) {
     if (clear < 0.8) warn.push(`lỗ móc nằm sát thành đế (${clear.toFixed(2)} mm) — tăng "tai nhô ra"`);
   }
 
-  return { W, D, H, n: cells.length, clr, ledge, wall, under, need, seat, gap, loop, warn };
+  return { W, D, H, n: cells.length, clr, ledge, wall, under, need, seat, gap,
+           floor, floorHole: floor > 0 ? o.floorHole : 0, loop, warn };
 }
 
 export function exportHolder3mf(p = {}, plate = 256) {

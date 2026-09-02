@@ -73,21 +73,63 @@ console.log('--- de 1 switch (mac dinh) ---');
   chk('hoc bat dau ngay duoi tam', Math.abs(wellZ.lo[2] - o.plateT) < 1e-6,
       `z ${wellZ.lo[2].toFixed(2)}`);
 
-  // Does a real switch physically fit?
-  const free = H - o.plateT;
+  // Does a real switch physically fit?  The free depth is the well, NOT
+  // H - plateT: the floor takes the last floor mm and the pins stop at the floor.
+  const free = o.wellH;
   chk('du sau cho vo duoi + chan switch', free >= MX.belowPlate + MX.pins,
-      `trong ${free.toFixed(1)} mm, switch can ${(MX.belowPlate + MX.pins).toFixed(1)} mm`);
+      `hoc sau ${free.toFixed(1)} mm, switch can ${(MX.belowPlate + MX.pins).toFixed(1)} mm ` +
+      `-> con ho ${(free - MX.belowPlate - MX.pins).toFixed(1)} mm den day`);
+  chk('day khong nam trong vung switch chiem', H - o.floor >= o.plateT + MX.belowPlate + MX.pins,
+      `day bat dau z=${(H - o.floor).toFixed(2)}, chan switch den z=${(o.plateT + MX.belowPlate + MX.pins).toFixed(2)}`);
   const seat = (o.bodyW - o.cut) / 2;
   chk('go do vo tren 15.6 mm', o.bodyW >= MX.housing && seat >= 1.2,
       `de ${o.bodyW} mm, go ${seat.toFixed(2)} mm moi ben`);
 
   // Print orientation: the body must never get narrower as z rises, or the foot
   // taper is pointing the wrong way and the whole thing needs support.
+  // The wall must never get NARROWER as z rises — that is the direction that
+  // needs support.  Straight (the default) and flaring are both fine.
   const bot = extent(body, 0, 0.01), top = extent(body, H - 0.01, H);
-  chk('vo ngoai loe ra khi len cao (tu do)', top.w > bot.w && top.d > bot.d,
-      `${bot.w.toFixed(1)} mm o tam -> ${top.w.toFixed(1)} mm o chan de`);
+  chk('vo ngoai khong thu vao khi len cao', top.w >= bot.w - 1e-6 && top.d >= bot.d - 1e-6,
+      `${bot.w.toFixed(1)} mm o tam -> ${top.w.toFixed(1)} mm o day`);
+  chk('mac dinh la thanh thang (khong be)', Math.abs(top.w - bot.w) < 1e-6,
+      `${(top.w - bot.w).toFixed(3)} mm chenh lech`);
   const lean = Math.atan2((top.w - bot.w) / 2, H) * 180 / Math.PI;
-  chk('do nghieng thanh trong khoang in duoc', lean > 0 && lean < 50, `${lean.toFixed(1)}° so voi thang dung`);
+  chk('be chan de van in duoc khi bat len', (() => {
+    const f = buildHolder({ footGrow: 7 });
+    const b2 = f.parts.find((q) => q.name.startsWith('Holder')).mesh;
+    const H2 = holderSize({ footGrow: 7 }).H;
+    const lo2 = extent(b2, 0, 0.01), hi2 = extent(b2, H2 - 0.01, H2);
+    const a = Math.atan2((hi2.w - lo2.w) / 2, H2) * 180 / Math.PI;
+    return hi2.w > lo2.w && a < 50;
+  })(), `mac dinh ${lean.toFixed(1)}°`);
+
+  // ---- the floor: this is what was missing and let you see the pins from behind
+  const wellTop = well.bounds.hi[2];
+  chk('hoc DUNG truoc mat sau (co day)', wellTop < H - 1e-6,
+      `hoc den z=${wellTop.toFixed(2)}, than de cao ${H.toFixed(2)} -> day ${(H - wellTop).toFixed(2)} mm`);
+  chk('day dung so', Math.abs((H - wellTop) - o.floor) < 1e-6, `${(H - wellTop).toFixed(3)} mm`);
+  chk('mat sau la mat dac', Math.abs(body.bounds.hi[2] - H) < 1e-6 &&
+      !h.parts.some((q) => q.subtype === 'negative_part' && q.mesh.bounds.hi[2] > H + 1e-6 &&
+                           !/Keyring/.test(q.name)),
+      'khong part tru nao xuyen qua mat sau');
+  {
+    const open = buildHolder({ floor: 0 });
+    const ow = open.parts.find((q) => q.name === 'Clip clearance').mesh;
+    const oH = holderSize({ floor: 0 }).H;
+    chk('day=0 thi ho lai nhu truoc', ow.bounds.hi[2] > oH,
+        `hoc den z=${ow.bounds.hi[2].toFixed(2)} > cao ${oH.toFixed(2)}`);
+  }
+  {
+    const ph = buildHolder({ floorHole: 6 });
+    const p = ph.parts.find((q) => q.name === 'Push-out holes');
+    const dia = p ? Math.max(p.mesh.bounds.hi[0] - p.mesh.bounds.lo[0],
+                             p.mesh.bounds.hi[1] - p.mesh.bounds.lo[1]) : 0;
+    chk('lo day switch xuyen het day', !!p && Math.abs(dia - 6) < 0.03 &&
+        p.mesh.bounds.hi[2] > H && p.mesh.bounds.lo[2] < H - o.floor,
+        p ? `⌀${dia.toFixed(2)} mm, z ${p.mesh.bounds.lo[2].toFixed(2)}..${p.mesh.bounds.hi[2].toFixed(2)}` : 'khong co');
+    chk('khong bat thi khong co lo day', !buildHolder().parts.some((q) => /Push-out/.test(q.name)));
+  }
 
   for (const pt of h.parts) {
     const a = audit(pt.mesh);
@@ -181,6 +223,8 @@ const cases = [
   ['lo 1.5 mm', { loopHole: 1.5 }, /khoen chìa khoá/],
   ['dau tai chi con 0.5 mm', { loopEdge: 0.5 }, /đứt/],
   ['tai nho ra 3 mm', { loopOut: 3.0 }, /sát thành đế/],
+  ['day 0.5 mm', { floor: 0.5 }, /đáy sẽ rỗ/],
+  ['lo day 15 mm trong hoc 16.4', { floorHole: 15 }, /gần như không còn gì/],
 ];
 for (const [label, over, re] of cases) {
   const w = holderInfo(over).warn;

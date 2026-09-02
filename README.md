@@ -98,6 +98,22 @@ over after printing and the plate is on top where the switch goes in.
 
 ![The holder seen from the plate: 21 mm square with the 14.15 mm cutout and a keyring lug](docs/holder.png)
 
+The far end of the well is closed by a **floor**. The first version left it open —
+the well cut clean through — which made the base a tube: the switch and its pins
+showed through both faces, and on a keyring the pins catch on everything. The floor
+is the one feature the slicer has to bridge, a single span across the cavity anchored
+on all four walls, and it is the *only* unsupported surface in the whole part (a full
+overhang audit of the boolean result finds 268 mm² of horizontal down-face at the
+floor and nothing else at any angle). **Do not enable support** — by that layer the
+cavity is sealed, and support inside it can never come out. Set the floor to 0 to get
+the open frame back, which is still the right thing for a bench tester you want to
+poke wires into; a closed floor has no way to release the switch again, so set a
+*push-out hole* of 5–6 mm if you want to be able to drive it back out with a rod.
+
+The sides are straight. A flared foot is steadier on a bench and looks like a
+doorstop on a keyring, and it was never a printing requirement — a vertical wall is
+exactly as self-supporting as one leaning outward. `footGrow` brings it back.
+
 The keyring lug is a tab sticking out at plate level, not a hole through the plate:
 between the switch cutout and the rim there are only 3.4 mm of plate, and 1.5 mm of
 PLA with a 3 mm hole in it is a hinge, not a lug. So the tab is 3 mm thick — twice
