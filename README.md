@@ -34,7 +34,8 @@ yourself. This one asks for the numbers directly and then checks them:
 - **A calibration plate.** One plate of test pieces whose slots step through a range,
   each with its own width engraved on it. Print it once, keep the number.
 - **A switch holder.** A base you press a real MX switch into, so there is something
-  to test the calibration pieces and the finished caps against.
+  to test the calibration pieces and the finished caps against — with a keyring lug,
+  because one switch on a base is a fidget toy whether you meant it to be or not.
 - **Two-colour 3MF.** Cap and legend become separate parts with their own filament,
   and the file declares two filament slots so the assignment survives the import.
 
@@ -95,10 +96,25 @@ leans *outward* as it rises — the self-supporting direction. The result has a 
 stable foot, no overhang anywhere, and no support to dig out of the well. Turn it
 over after printing and the plate is on top where the switch goes in.
 
+![The holder seen from the plate: 21 mm square with the 14.15 mm cutout and a keyring lug](docs/holder.png)
+
+The keyring lug is a tab sticking out at plate level, not a hole through the plate:
+between the switch cutout and the rim there are only 3.4 mm of plate, and 1.5 mm of
+PLA with a 3 mm hole in it is a hinge, not a lug. So the tab is 3 mm thick — twice
+the plate — overlaps 2 mm into the body, and ends in a semicircle around a ⌀3.2 mm
+eye for a standard split ring, with 1.6 mm of material beyond it and 2.4 mm each
+side. It sits on the build plate as part of the first layer, so it costs nothing in
+print time and has no overhang either. Turn it off with the checkbox if you just
+want a bench tester.
+
 The checks are the same idea as the keycap's: it will tell you when the cutout is
 too tight to take a switch or too loose to hold one, when the plate is outside the
 1.2–1.8 mm the clips are cut for, when the well is too shallow for the housing and
 pins, and — with several cells — when two wells are about to merge into each other.
+The lug has its own: too little material beside or beyond the eye, a tab under 2 mm
+thick, an eye too small for a split ring, or a lug so short that the eye runs into
+the body wall (which flares as it rises, so the check measures it at the top of the
+tab, where it is closest).
 
 ## Three things it gets right that are easy to get wrong
 

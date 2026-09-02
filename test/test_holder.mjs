@@ -4,7 +4,7 @@
 // trusting the parameters that went in, and check the print orientation really
 // is overhang-free.
 import { buildHolder, holderInfo, holderSize, cellCentres, exportHolder3mf,
-         HOLDER_DEFAULTS, MX } from '../src/holder.mjs';
+         loopGeom, HOLDER_DEFAULTS, MX } from '../src/holder.mjs';
 
 function audit(mesh) {
   const e = new Map();
@@ -97,6 +97,59 @@ console.log('--- de 1 switch (mac dinh) ---');
   console.log(`  kich thuoc: ${holderSize().W.toFixed(1)} × ${holderSize().D.toFixed(1)} × ${H.toFixed(1)} mm`);
 }
 
+// ------------------------------------------------------------- keyring tab
+// The tab is the part most likely to snap in a pocket, and the failure is always
+// the same: not enough material somewhere around the hole.  So measure the hole
+// out of the mesh and check the material on all three sides of it.
+console.log('\n--- tai moc khoa ---');
+{
+  const o = HOLDER_DEFAULTS, g = loopGeom(), { W, H } = holderSize();
+  const h = buildHolder();
+  const tab = h.parts.find((p) => p.name === 'Keyring tab').mesh;
+  const eye = h.parts.find((p) => p.name === 'Keyring hole').mesh;
+  chk('mac dinh co tai', !!tab && !!eye, `${h.parts.length} part`);
+
+  const tb = tab.bounds, eb = eye.bounds;
+  chk('tai in phang tu mat ban', Math.abs(tb.lo[2]) < 1e-6 && Math.abs(tb.hi[2] - o.loopT) < 1e-6,
+      `z ${tb.lo[2].toFixed(2)}..${tb.hi[2].toFixed(2)}`);
+  chk('tai an vao than de (khong roi ra)', tb.lo[0] < W / 2 - 1,
+      `tai bat dau x=${tb.lo[0].toFixed(2)}, than de den x=${(W / 2).toFixed(2)}`);
+  chk('be tai dung so', Math.abs((tb.hi[1] - tb.lo[1]) - o.loopW) < 1e-6,
+      `${(tb.hi[1] - tb.lo[1]).toFixed(3)} mm`);
+
+  const dia = Math.max(eb.hi[0] - eb.lo[0], eb.hi[1] - eb.lo[1]);
+  chk('lo do lai', Math.abs(dia - o.loopHole) < 0.02, `⌀${dia.toFixed(3)} mm`);
+  chk('lo xuyen qua het tai', eb.lo[2] < 0 && eb.hi[2] > o.loopT,
+      `z ${eb.lo[2].toFixed(2)}..${eb.hi[2].toFixed(2)} vs tai day ${o.loopT}`);
+
+  // material on the three sides that matter
+  const beyond = tb.hi[0] - eb.hi[0];
+  const side = (o.loopW - dia) / 2;
+  const wallAt = (W + o.footGrow * (o.loopT / H)) / 2;
+  const inward = eb.lo[0] - wallAt;
+  chk('con nhua sau lo', beyond >= 1.2, `${beyond.toFixed(2)} mm`);
+  chk('con nhua hai ben lo', side >= 1.6, `${side.toFixed(2)} mm moi ben`);
+  chk('lo khong an vao thanh de', inward >= 0.8,
+      `${inward.toFixed(2)} mm (thanh de o cao ${o.loopT} mm la x=${wallAt.toFixed(2)})`);
+
+  // the hole must not reach the switch cutout or the clip well
+  const cutHalf = o.cut / 2, wellHalf = o.well / 2;
+  chk('lo cach xa hoc switch va hoc ngam', eb.lo[0] > wellHalf && eb.lo[0] > cutHalf,
+      `lo tu x=${eb.lo[0].toFixed(2)}, hoc ngam den x=${wellHalf.toFixed(2)}`);
+
+  for (const pt of h.parts) {
+    const a = audit(pt.mesh);
+    if (a.open || a.over || a.repeated || a.vol <= 0)
+      chk(`kin khoi: ${pt.name}`, false, `ho=${a.open} >2=${a.over} lap=${a.repeated}`);
+  }
+  chk('moi part van kin khoi', true, `${h.parts.length} part`);
+
+  const off = buildHolder({ loop: false });
+  chk('tat tai thi mat han', off.parts.length === 3 &&
+      !off.parts.some((p) => /Keyring/.test(p.name)) && holderInfo({ loop: false }).loop === null,
+      off.parts.map((p) => p.name).join(', '));
+}
+
 // ---------------------------------------------------------------- multi-cell
 console.log('\n--- nhieu switch ---');
 for (const [n, pitch] of [[2, 19.05], [5, 19.05], [5, 18.0]]) {
@@ -123,6 +176,11 @@ const cases = [
   ['hoc duoi tam chi sau 4 mm', { wellH: 4.0 }, /chặn switch/],
   ['hoc rong 20 mm trong de 21', { well: 20.0 }, /mỏng/],
   ['5 switch @ pitch 16.5', { count: 5, pitch: 16.5 }, /cách/],
+  ['tai day 1.2 mm', { loopT: 1.2 }, /gãy/],
+  ['lo 6 mm trong tai 8 mm', { loopHole: 6.0 }, /hai bên lỗ/],
+  ['lo 1.5 mm', { loopHole: 1.5 }, /khoen chìa khoá/],
+  ['dau tai chi con 0.5 mm', { loopEdge: 0.5 }, /đứt/],
+  ['tai nho ra 3 mm', { loopOut: 3.0 }, /sát thành đế/],
 ];
 for (const [label, over, re] of cases) {
   const w = holderInfo(over).warn;
@@ -136,9 +194,15 @@ const mf = exportHolder3mf();
 const txt = Buffer.from(mf).toString('latin1');
 chk('3mf hop le', txt.startsWith('PK') && txt.includes('model_settings.config'),
     `${(mf.length / 1024).toFixed(1)} KB`);
-chk('2 part tru + 1 part cong',
-    (txt.match(/subtype="negative_part"/g) || []).length === 2 &&
-    (txt.match(/subtype="normal_part"/g) || []).length === 1);
+// body + tab add; cutout, well and keyring hole subtract
+chk('3 part tru + 2 part cong',
+    (txt.match(/subtype="negative_part"/g) || []).length === 3 &&
+    (txt.match(/subtype="normal_part"/g) || []).length === 2);
+chk('tat tai -> 2 part tru + 1 part cong', (() => {
+  const t = Buffer.from(exportHolder3mf({ loop: false })).toString('latin1');
+  return (t.match(/subtype="negative_part"/g) || []).length === 2 &&
+         (t.match(/subtype="normal_part"/g) || []).length === 1;
+})());
 chk('mot object tren khay', (txt.match(/<item objectid=/g) || []).length === 1);
 
 console.log(fail ? `\n${fail} LOI` : '\nde giu switch: dung chuan MX plate-mount, in khong can support');

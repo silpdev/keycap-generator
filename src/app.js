@@ -746,9 +746,10 @@
 
   // ---------------------------------------------------- switch holder base
   const H_KEYS = { hCount: 'count', hPitch: 'pitch', hCut: 'cut', hPlateT: 'plateT',
-                   hWell: 'well', hWellH: 'wellH', hBodyW: 'bodyW' };
+                   hWell: 'well', hWellH: 'wellH', hBodyW: 'bodyW',
+                   hLoopHole: 'loopHole', hLoopOut: 'loopOut', hLoopW: 'loopW', hLoopT: 'loopT' };
   const holderOpts = () => {
-    const o = {};
+    const o = { loop: $('hLoop').checked };
     for (const [id, key] of Object.entries(H_KEYS)) {
       const v = parseFloat($(id).value);
       if (isFinite(v)) o[key] = v;
@@ -760,12 +761,16 @@
     $('hInfo').textContent =
       `${i.n} switch · đế ${i.W.toFixed(1)} × ${i.D.toFixed(1)} × ${i.H.toFixed(1)} mm · ` +
       `dư so với lỗ chuẩn +${i.clr.toFixed(2)} mm · gờ cho ngàm ${i.ledge.toFixed(2)} mm · ` +
-      `trống dưới tấm ${i.under.toFixed(1)}/${i.need.toFixed(1)} mm`;
+      `trống dưới tấm ${i.under.toFixed(1)}/${i.need.toFixed(1)} mm` +
+      (i.loop ? ` · tai ⌀${i.loop.hole.toFixed(1)} mm, hai bên còn ${i.loop.side.toFixed(1)} mm` : '');
+    for (const id of ['hLoopHole', 'hLoopOut', 'hLoopW', 'hLoopT'])
+      $(id).disabled = !$('hLoop').checked;
     $('hMsgs').innerHTML = i.warn.length
       ? i.warn.map((s) => `<li>${s}</li>`).join('')
       : '<li class="good">Đúng chuẩn MX plate-mount — switch sẽ ấn vào và kẹp được.</li>';
   }
   for (const id of Object.keys(H_KEYS)) $(id).addEventListener('input', drawHolder);
+  $('hLoop').addEventListener('change', drawHolder);
   // A warning here means the switch will not go in or will not stay in, which is
   // a wasted print — so it takes a second click.  Two clicks, not a modal dialog:
   // a confirm() blocks the whole page and some embeddings refuse it outright.
@@ -780,7 +785,7 @@
       return;
     }
     holderArmed = false;
-    offer(`de-switch-mx-${i.n}x.3mf`, exportHolder3mf(o, P.plate));
+    offer(`de-switch-mx-${i.n}x${o.loop ? '-mockhoa' : ''}.3mf`, exportHolder3mf(o, P.plate));
   };
 
   $('dljson').onclick = () => {

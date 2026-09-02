@@ -30,7 +30,8 @@ hỏi thẳng số đo rồi kiểm tra lại:
 - **Khay hiệu chuẩn khe chân.** Một khay gồm nhiều mẩu thử, khe tăng dần theo bước,
   mỗi mẩu dập sẵn số của chính nó. In một lần, giữ lấy con số.
 - **Đế giữ switch.** Đế để ấn switch MX thật vào, có chỗ mà thử mấy mẩu hiệu chuẩn
-  và thử cap in xong.
+  và thử cap in xong — kèm tai móc khoá, vì một cái switch trên đế thì kiểu gì cũng
+  thành đồ fidget.
 - **3MF hai màu.** Thân cap và logo thành hai part riêng có filament riêng, và file
   khai báo sẵn hai slot filament để phần gán màu không bị mất khi import.
 
@@ -87,10 +88,23 @@ khi lên cao — hướng tự đỡ được. Kết quả: chân đế rộng c
 không có support nào phải móc ra khỏi hốc. In xong lật ngược lại là mặt tấm ở trên,
 đúng chỗ nhét switch.
 
+![Đế nhìn từ mặt tấm: 21 mm vuông, lỗ 14.15 mm và tai móc khoá](docs/holder.png)
+
+Tai móc khoá là một cái tai nhô ra ở mức mặt tấm, không phải lỗ khoan xuyên tấm:
+giữa lỗ switch và rìa đế chỉ còn 3.4 mm, mà 1.5 mm PLA có lỗ 3 mm ở giữa thì là cái
+bản lề chứ không phải tai. Nên tai dày 3 mm — gấp đôi tấm — ăn 2 mm vào thân đế, và
+kết thúc bằng nửa vòng tròn quanh lỗ ⌀3.2 mm vừa khoen chìa khoá thường, còn 1.6 mm
+nhựa phía sau lỗ và 2.4 mm mỗi bên. Tai nằm trên mặt bàn in ngay từ lớp đầu nên không
+tốn thêm thời gian in và cũng không có overhang. Không cần thì bỏ tick, còn lại đúng
+cái đế thử.
+
 Phần kiểm tra cũng cùng một ý với cap: nó báo khi lỗ chật quá không nhét được switch
 hoặc rộng quá không giữ được, khi tấm ra ngoài khoảng 1.2–1.8 mm mà ngàm cắt cho, khi
 hốc dưới tấm cạn hơn phần vỏ dưới cộng chân, và — khi làm nhiều ô — khi hai hốc kề
-nhau sắp ăn thông vào nhau.
+nhau sắp ăn thông vào nhau. Tai móc khoá có phần kiểm riêng: thiếu nhựa hai bên hoặc
+phía sau lỗ, tai mỏng dưới 2 mm, lỗ nhỏ quá không lồng khoen được, hoặc tai ngắn quá
+làm lỗ ăn vào thành đế (thành đế loe ra khi lên cao, nên nó đo ở đỉnh tai — chỗ sát
+nhất).
 
 ## Ba chỗ dễ sai mà nó làm đúng
 
@@ -136,8 +150,9 @@ npm test      # không cần cài gì — core và test chỉ dùng builtin củ
   `test_export.mjs`.
 - **`test_holder.mjs`** — đế giữ switch. Đo lại lỗ, dày tấm và độ trống dưới tấm từ
   mesh rồi kiểm switch thật có nhét vô được không, xác nhận vỏ ngoài không bao giờ
-  thu vào khi lên cao (loe sai chiều là phải support khắp), và đẩy sáu cấu hình cố
-  ý sai qua phần kiểm tra để chắc mỗi lỗi đều bị bắt.
+  thu vào khi lên cao (loe sai chiều là phải support khắp), đo lỗ móc khoá từ mesh rồi kiểm nhựa
+  cả ba phía cùng khoảng cách tới hốc ngàm, và đẩy mười một cấu hình cố ý sai qua
+  phần kiểm tra để chắc mỗi lỗi đều bị bắt.
 - **`test_mesh.mjs`** — ghi từng part ra `out/*.stl` rồi in kích thước.
 
 ## Phát triển

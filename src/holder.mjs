@@ -38,6 +38,15 @@ export const HOLDER_DEFAULTS = {
   bodyW: 21.0,         // plate footprint per cell
   footGrow: 7.0,       // how much wider the foot is than the plate, total
   cornerR: 2.0,
+  // Keyring lug.  It has to be a tab sticking out, not a hole through the plate:
+  // between the switch cutout and the rim there are only (bodyW - cut)/2 ≈ 3.4 mm
+  // of plate, and 1.5 mm of PLA with a 3 mm hole in it is a hinge, not a lug.
+  loop: true,
+  loopOut: 7.0,        // how far past the body the tab reaches
+  loopW: 8.0,          // tab width
+  loopT: 3.0,          // tab thickness — twice the plate, and it prints flat
+  loopHole: 3.2,       // ⌀ for a standard split ring
+  loopEdge: 1.6,       // material left beyond the hole
 };
 
 /** Square cutout ring, centred at (cx, 0), with a small corner radius. */
@@ -76,6 +85,28 @@ function buildBody(p) {
   return m;
 }
 
+/**
+ * Where the keyring tab lives, in the model's own frame.  It hangs off +x at
+ * plate level, overlapping 2 mm into the body so the union has something to hold
+ * on to, and its outer end is a semicircle around the hole.
+ */
+export function loopGeom(p = {}) {
+  const o = { ...HOLDER_DEFAULTS, ...p };
+  const { W } = holderSize(o);
+  const x0 = W / 2 - 2, x1 = W / 2 + o.loopOut;
+  const len = x1 - x0;
+  const hole = x1 - (o.loopHole / 2 + o.loopEdge);
+  return { x0, x1, len, cx: (x0 + x1) / 2, hole, t: o.loopT, w: o.loopW };
+}
+
+function circle(d, cx, n = 32) {
+  const r = d / 2;
+  return { outer: Array.from({ length: n }, (_, i) => {
+    const a = (2 * Math.PI * i) / n;
+    return [cx + r * Math.cos(a), r * Math.sin(a)];
+  }), holes: [] };
+}
+
 /** { parts, info } in the same shape buildKeycap returns. */
 export function buildHolder(p = {}) {
   const o = { ...HOLDER_DEFAULTS, ...p };
@@ -84,14 +115,25 @@ export function buildHolder(p = {}) {
   const cuts = buildPrism(cells.map((cx) => cell(o.cut, cx)), -0.3, o.plateT).weld();
   const wells = buildPrism(cells.map((cx) => cell(o.well, cx, 0.8)), o.plateT, H + 0.3).weld();
 
-  return {
-    parts: [
-      { name: `Holder ${cells.length}x`, mesh: buildBody(o).weld(), extruder: 1, subtype: 'normal_part' },
-      { name: 'Switch cutouts', mesh: cuts, subtype: 'negative_part' },
-      { name: 'Clip clearance', mesh: wells, subtype: 'negative_part' },
-    ],
-    info: holderInfo(o),
-  };
+  const parts = [
+    { name: `Holder ${cells.length}x`, mesh: buildBody(o).weld(), extruder: 1, subtype: 'normal_part' },
+    { name: 'Switch cutouts', mesh: cuts, subtype: 'negative_part' },
+    { name: 'Clip clearance', mesh: wells, subtype: 'negative_part' },
+  ];
+
+  if (o.loop) {
+    const g = loopGeom(o);
+    const tab = buildPrism(
+      [{ outer: roundedRect(g.len, g.w, Math.min(g.w / 2, g.len / 2) - 1e-4, 10)
+          .map((q) => [q[0] + g.cx, q[1]]), holes: [] }], 0, g.t).weld();
+    // The lug sits entirely clear of the switch cutout and the clip well, so its
+    // hole cuts only the tab and the two cannot interfere.
+    const eye = buildPrism([circle(o.loopHole, g.hole)], -0.3, g.t + 0.3).weld();
+    parts.push({ name: 'Keyring tab', mesh: tab, extruder: 1, subtype: 'normal_part' });
+    parts.push({ name: 'Keyring hole', mesh: eye, subtype: 'negative_part' });
+  }
+
+  return { parts, info: holderInfo(o) };
 }
 
 /**
@@ -119,7 +161,24 @@ export function holderInfo(p = {}) {
   if (seat < 1.2) warn.push(`gờ đỡ vỏ switch còn ${seat.toFixed(2)} mm — vỏ trên 15.6 mm gần như không có chỗ tựa`);
   if (gap < 1.0) warn.push(`hai hốc kề nhau chỉ cách ${gap.toFixed(2)} mm — giảm "hốc dưới tấm" hoặc tăng pitch`);
 
-  return { W, D, H, n: cells.length, clr, ledge, wall, under, need, seat, gap, warn };
+  let loop = null;
+  if (o.loop) {
+    const g = loopGeom(o);
+    const side = (o.loopW - o.loopHole) / 2;     // material each side of the hole
+    // The body flares as it rises, so the wall is closest to the hole at the top
+    // of the tab, not at the plate — measure it there.
+    const wallAt = (W + o.footGrow * (o.loopT / H)) / 2;
+    const clear = g.hole - o.loopHole / 2 - wallAt;
+    loop = { out: o.loopOut, w: o.loopW, t: o.loopT, hole: o.loopHole,
+             side, edge: o.loopEdge, reach: g.x1 - W / 2 };
+    if (side < 1.6) warn.push(`hai bên lỗ móc chỉ còn ${side.toFixed(2)} mm — nới "bề tai" hoặc giảm đường kính lỗ`);
+    if (o.loopEdge < 1.2) warn.push(`đầu tai sau lỗ chỉ còn ${o.loopEdge.toFixed(2)} mm — tai sẽ đứt ở đó`);
+    if (o.loopT < 2.0) warn.push(`tai dày ${o.loopT.toFixed(1)} mm — dưới 2 mm là bẻ mấy lần sẽ gãy`);
+    if (o.loopHole < 2.4) warn.push(`lỗ ⌀${o.loopHole.toFixed(1)} mm — khoen chìa khoá thường cần ⌀3 mm trở lên`);
+    if (clear < 0.8) warn.push(`lỗ móc nằm sát thành đế (${clear.toFixed(2)} mm) — tăng "tai nhô ra"`);
+  }
+
+  return { W, D, H, n: cells.length, clr, ledge, wall, under, need, seat, gap, loop, warn };
 }
 
 export function exportHolder3mf(p = {}, plate = 256) {
